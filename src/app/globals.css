@@ -1,0 +1,172 @@
+@import "tailwindcss";
+
+/*
+ * Pookies design tokens.
+ * Warm, soft and friendly. Violet is the brand colour on purpose: green, amber
+ * and red are reserved for presence, so the brand never reads as a status.
+ */
+@theme {
+  /* Surfaces */
+  --color-canvas: #fff7ee;
+  --color-surface: #ffffff;
+  --color-sunken: #fbeee0;
+  --color-line: #f0e2d3;
+  --color-line-strong: #e2cfbb;
+
+  /* Text */
+  --color-ink: #2b2233;
+  --color-ink-soft: #6a6074;
+  --color-ink-faint: #9a90a4;
+
+  /* Brand */
+  --color-brand: #6b4ee6;
+  --color-brand-strong: #5638cf;
+  --color-brand-soft: #eee9ff;
+  --color-brand-ink: #4a2fb8;
+
+  /* Presence: a dot colour, a text-safe ink and a soft background each */
+  --color-online: #22b07d;
+  --color-online-ink: #0f6b4c;
+  --color-online-soft: #e0f6ec;
+  --color-busy: #e5484d;
+  --color-busy-ink: #ad1f27;
+  --color-busy-soft: #fde7e7;
+  --color-away: #f2a31b;
+  --color-away-ink: #875600;
+  --color-away-soft: #fff0d2;
+  --color-offline: #b5adbd;
+  --color-offline-ink: #6a6074;
+  --color-offline-soft: #f1edf3;
+
+  --color-danger: #c62f36;
+  --color-danger-soft: #fde7e7;
+
+  /* Type */
+  --font-sans: var(--font-body), ui-rounded, "Segoe UI", system-ui, sans-serif;
+  --font-display: var(--font-heading), ui-rounded, "Segoe UI", system-ui, sans-serif;
+
+  /* Shape and depth */
+  --radius-card: 1.5rem;
+  --shadow-card: 0 1px 2px rgb(74 47 20 / 0.04), 0 8px 24px -12px rgb(74 47 20 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(74 47 20 / 0.06), 0 16px 32px -16px rgb(74 47 20 / 0.2);
+
+  --animate-pop: pop 0.45s ease-out;
+  --animate-rise: rise 0.35s ease-out both;
+  --animate-breathe: breathe 2.6s ease-in-out infinite;
+  --animate-bob: bob 0.32s ease-in-out infinite;
+  --animate-emote: emote 1.8s ease-out both;
+  --animate-marker: marker 1s ease-out infinite;
+
+  @keyframes pop {
+    0% {
+      transform: scale(0.96);
+    }
+    60% {
+      transform: scale(1.02);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes emote {
+    0% {
+      opacity: 0;
+      transform: translateY(8px) scale(0.5);
+    }
+    15% {
+      opacity: 1;
+      transform: translateY(0) scale(1.15) rotate(-14deg);
+    }
+    35% {
+      transform: scale(1) rotate(14deg);
+    }
+    55% {
+      transform: scale(1) rotate(-14deg);
+    }
+    75% {
+      opacity: 1;
+      transform: scale(1) rotate(10deg);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-10px) scale(1);
+    }
+  }
+
+  @keyframes marker {
+    0% {
+      opacity: 0.9;
+      transform: scale(0.5);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.5);
+    }
+  }
+
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0;
+      transform: scale(1.9);
+    }
+  }
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
