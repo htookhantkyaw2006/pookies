@@ -234,6 +234,15 @@ begin
   get diagnostics n = row_count;
   if n <> 1 then raise exception 'CHECK FAILED: the admin could not rename the workspace'; end if;
 
+  -- An invite link's page can show which office it's for, and nothing more.
+  if (select workspace_name from public.invite_preview(invite_token)) is distinct from 'Ana''s Office'
+     or (select member_count from public.invite_preview(invite_token)) <> 3 then
+    raise exception 'CHECK FAILED: an invite link did not show its workspace';
+  end if;
+  if exists (select 1 from public.invite_preview('not-a-real-token')) then
+    raise exception 'CHECK FAILED: a made-up invite token showed a workspace';
+  end if;
+
   denied := false;
   begin
     perform public.set_member_role(ana, 'member');
@@ -335,6 +344,33 @@ begin
   exception when raise_exception then denied := true;
   end;
   if not denied then raise exception 'CHECK FAILED: an outsider took down a photo'; end if;
+
+  -- A new account: sets up its profile, then starts its own workspace.
+  denied := false;
+  begin
+    perform public.create_workspace('Too soon');
+  exception when raise_exception then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: a workspace was made before a profile'; end if;
+  denied := false;
+  begin
+    perform public.save_profile('Dee', 'neon', 'cat', 'UTC');
+  exception when raise_exception then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: a made-up pookie colour was saved'; end if;
+  perform public.save_profile('  Dee   Dee ', 'mint', 'cat', 'Europe/Paris');
+  if (select display_name from public.profiles where id = dee) <> 'Dee Dee' then
+    raise exception 'CHECK FAILED: a new account could not save its profile';
+  end if;
+  -- (Two steps: one statement can't see rows a function inside it has just added.)
+  perform public.create_workspace('Dee Co');
+  if not exists (select 1 from public.workspace_members where user_id = dee and role = 'admin') then
+    raise exception 'CHECK FAILED: a new account could not start its own workspace';
+  end if;
+  -- ...and still can't see into anyone else's.
+  if exists (select 1 from public.workspace_members where workspace_id = office) then
+    raise exception 'CHECK FAILED: a new workspace''s admin can see another workspace';
+  end if;
   if private.can_use_topic('workspace:' || office::text) then
     raise exception 'CHECK FAILED: an outsider can join the live channel';
   end if;
@@ -382,6 +418,16 @@ begin
   exception when insufficient_privilege then denied := true;
   end;
   if not denied then raise exception 'CHECK FAILED: a signed-out visitor called an action'; end if;
+  denied := false;
+  begin
+    perform public.save_profile('Nobody', 'peach', 'cat', 'UTC');
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: a signed-out visitor saved a profile'; end if;
+  -- Revoked links show nothing, even to visitors.
+  if exists (select 1 from public.invite_preview(invite_token)) then
+    raise exception 'CHECK FAILED: a revoked invite link still showed its workspace';
+  end if;
 
   execute 'reset role';
   if exists (select 1 from public.profiles where id = ben) then

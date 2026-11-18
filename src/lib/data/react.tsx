@@ -9,6 +9,7 @@ import {
 } from "react";
 import { officeStore } from "./store";
 import type {
+  Account,
   Member,
   OfficeActions,
   OfficeConnection,
@@ -68,18 +69,27 @@ export function OfficeGate({
   children,
   loading,
   signedOut,
+  setup,
   failed,
 }: {
   children: ReactNode;
   loading: ReactNode;
   signedOut: ReactNode;
+  /** Signed in with an account but not in a workspace yet. Falls back to `signedOut`. */
+  setup?: (account: Account) => ReactNode;
   failed: (message: string) => ReactNode;
 }) {
   const { connection, office } = useProvider();
   if (office) return <>{children}</>;
   if (connection.phase === "signed-out") return <>{signedOut}</>;
+  if (connection.phase === "setup") return <>{setup ? setup(connection.account) : signedOut}</>;
   if (connection.phase === "error") return <>{failed(connection.message)}</>;
   return <>{loading}</>;
+}
+
+/** Where this browser stands: loading, signed out, setting up, ready or failed. */
+export function useConnection() {
+  return useProvider().connection;
 }
 
 /** The connected office. Only call inside <OfficeGate>. */

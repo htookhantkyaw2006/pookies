@@ -11,11 +11,14 @@ import {
   cleanLine,
   validateCheckIn,
   validateName,
+  validateEmail,
+  validatePassword,
   validatePhoto,
   validateScore,
   PHOTO_WALL_SIZE,
 } from "../rules";
 import {
+  type Account,
   AVATAR_COLORS,
   AVATAR_SHAPES,
   GAMES,
@@ -160,13 +163,13 @@ function toPlants(value: Json): Record<string, number> {
 async function fetchWorkspace(id: string): Promise<WorkspaceAndThings | null> {
   const { data, error } = await getSupabase()
     .from("workspaces")
-    .select("id, name, board_text, board_by, board_at, plants")
+    .select("id, name, is_demo, board_text, board_by, board_at, plants")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
   return {
-    workspace: { id: data.id, name: data.name },
+    workspace: { id: data.id, name: data.name, demo: data.is_demo },
     things: {
       board: data.board_text
         ? {
@@ -517,10 +520,13 @@ async function connect(me: string): Promise<void> {
     if (current !== attempt) return;
 
     if (!membership) {
-      // Signed in, but not in a workspace yet (a guest who hasn't picked a name).
       closeChannel();
       workspace = null;
-      setConnection(SIGNED_OUT);
+      const account = await fetchAccount(me);
+      if (current !== attempt) return;
+      // A guest who hasn't picked a name yet sees the way in; an account
+      // gets to create a workspace or join one.
+      setConnection(account ? { phase: "setup", account } : SIGNED_OUT);
       return;
     }
 
@@ -538,6 +544,56 @@ async function connect(me: string): Promise<void> {
     publish();
   } catch {
     if (current === attempt) setConnection({ phase: "error", message: UNREACHABLE });
+  }
+}
+
+/** The signed-in account and its profile, or null for a guest (or nobody). */
+async function fetchAccount(me: string): Promise<Account | null> {
+  const supabase = getSupabase();
+  const user = (await supabase.auth.getSession()).data.session?.user;
+  if (!user || user.id !== me || user.is_anonymous) return null;
+  const { data } = await supabase
+    .from("profiles")
+    .select("display_name, avatar_color, avatar_shape, timezone")
+    .eq("id", me)
+    .maybeSingle();
+  return {
+    userId: me,
+    email: user.email ?? null,
+    profile: data
+      ? {
+          displayName: data.display_name,
+          avatar: { color: toColor(data.avatar_color), shape: toShape(data.avatar_shape) },
+          timezone: data.timezone,
+        }
+      : null,
+  };
+}
+
+/** Turns what the sign-in service says into something a person can act on. */
+function describeAuth(message: string): string {
+  const text = message.toLowerCase();
+  if (text.includes("already registered") || text.includes("already been registered")) {
+    return "That email already has an account. Log in instead.";
+  }
+  if (text.includes("invalid login credentials")) return "That email and password don't match.";
+  if (text.includes("password")) return message;
+  if (text.includes("rate limit") || text.includes("too many")) {
+    return "Too many tries just now. Wait a minute and try again.";
+  }
+  if (text.includes("signups not allowed") || text.includes("signup is disabled")) {
+    return "New accounts are switched off for this office.";
+  }
+  return "We couldn't reach the sign-in service. Please try again.";
+}
+
+/** While signing up or in, the form drives the connection itself (see `entering`). */
+async function asEntering<T>(run: () => Promise<T>): Promise<T> {
+  entering = true;
+  try {
+    return await run();
+  } finally {
+    entering = false;
   }
 }
 
@@ -771,6 +827,102 @@ export const supabaseStore: OfficeStore = {
       } finally {
         entering = false;
       }
+    },
+
+    signUp: (input) =>
+      asEntering(async () => {
+        const email = validateEmail(input.email);
+        if (!email.ok) return email;
+        const password = validatePassword(input.password);
+        if (!password.ok) return password;
+        const name = validateName(input.profile.displayName, "Your name", NAME_MAX);
+        if (!name.ok) return name;
+
+        const supabase = getSupabase();
+        // A guest making an account starts fresh: their demo seat goes.
+        const before = (await supabase.auth.getSession()).data.session?.user;
+        if (before?.is_anonymous) {
+          await supabase.rpc("leave_demo_workspace");
+          await supabase.auth.signOut();
+        }
+
+        const { data, error } = await supabase.auth.signUp({
+          email: input.email.trim(),
+          password: input.password,
+        });
+        if (error) return fail(describeAuth(error.message));
+        if (!data.session || !data.user) {
+          return fail("Check your email to confirm your account, then log in.");
+        }
+
+        const saved = await supabase.rpc("save_profile", {
+          p_display_name: cleanLine(input.profile.displayName, NAME_MAX),
+          p_avatar_color: input.profile.avatar.color,
+          p_avatar_shape: input.profile.avatar.shape,
+          p_timezone: input.profile.timezone,
+        });
+        if (saved.error) return fail(describe(saved.error));
+        await connect(data.user.id);
+        return snapshot.phase === "error" ? fail(UNREACHABLE) : OK;
+      }),
+
+    signIn: (email, password) =>
+      asEntering(async () => {
+        if (!email.trim() || !password) return fail("Add your email and password.");
+        const supabase = getSupabase();
+        const before = (await supabase.auth.getSession()).data.session?.user;
+        if (before?.is_anonymous) {
+          await supabase.rpc("leave_demo_workspace");
+          await supabase.auth.signOut();
+        }
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (error || !data.user) return fail(describeAuth(error?.message ?? ""));
+        await connect(data.user.id);
+        return snapshot.phase === "error" ? fail(UNREACHABLE) : OK;
+      }),
+
+    async saveProfile(profile) {
+      const name = validateName(profile.displayName, "Your name", NAME_MAX);
+      if (!name.ok) return name;
+      if (!userId) return fail("Log in first.");
+      const { error } = await getSupabase().rpc("save_profile", {
+        p_display_name: cleanLine(profile.displayName, NAME_MAX),
+        p_avatar_color: profile.avatar.color,
+        p_avatar_shape: profile.avatar.shape,
+        p_timezone: profile.timezone,
+      });
+      if (error) return fail(describe(error));
+      await connect(userId);
+      return OK;
+    },
+
+    async createWorkspace(name) {
+      const valid = validateName(name, "Workspace name", WORKSPACE_NAME_MAX);
+      if (!valid.ok) return valid;
+      if (!userId) return fail("Log in first.");
+      const { error } = await getSupabase().rpc("create_workspace", {
+        p_name: cleanLine(name, WORKSPACE_NAME_MAX),
+      });
+      if (error) return fail(describe(error));
+      await connect(userId);
+      return snapshot.phase === "ready" ? OK : fail(UNREACHABLE);
+    },
+
+    async acceptInvite(token) {
+      if (!userId) return fail("Log in first.");
+      const { error } = await getSupabase().rpc("accept_invite", { p_token: token });
+      if (error) return fail(describe(error));
+      await connect(userId);
+      return snapshot.phase === "ready" ? OK : fail(UNREACHABLE);
+    },
+
+    async previewInvite(token) {
+      const { data, error } = await getSupabase().rpc("invite_preview", { p_token: token });
+      const row = error ? undefined : data?.[0];
+      return row ? { workspaceName: row.workspace_name, memberCount: row.member_count } : null;
     },
 
     async leave() {

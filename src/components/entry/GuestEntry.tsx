@@ -10,8 +10,8 @@ import { Button, Field, FormMessage, inputClass } from "@/components/ui/controls
 import { PookieAvatar } from "@/components/ui/PookieAvatar";
 
 /**
- * Guest mode (development): pick a name and a pookie, step into the shared
- * demo office. Replaced by Google sign-in once accounts are connected.
+ * Guest mode: pick a name and a pookie, step into the shared demo office
+ * without an account. Anyone with the link can walk in.
  */
 export function GuestEntry() {
   const session = useSession();
@@ -43,9 +43,9 @@ export function GuestEntry() {
           <PookieAvatar avatar={avatar} size={56} />
         </span>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">Step into the office</h1>
+          <h2 className="text-2xl font-semibold tracking-tight text-ink">Try the demo office</h2>
           <p className="mt-1 text-sm font-semibold text-ink-soft">
-            Pick a name and a pookie. No account needed for the demo office.
+            Pick a name and a pookie. No account needed: it&apos;s one shared office anyone can visit.
           </p>
         </div>
       </div>

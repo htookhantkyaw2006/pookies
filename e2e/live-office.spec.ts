@@ -86,6 +86,8 @@ test("two people see each other's presence, movement and check-ins live", async 
     await test.step("walking shows up for the other person", async () => {
       const before = await positionOf(ben, "Ana");
       await ana.bringToFront();
+      // Out of the status note box first, or the keys would type into it.
+      await closePopovers(ana);
       await ana.locator("#office-world").hover();
       await ana.keyboard.down("KeyD");
       await ana.waitForTimeout(900);

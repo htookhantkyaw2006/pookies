@@ -86,6 +86,8 @@ export interface Invite {
 export interface Workspace {
   id: string;
   name: string;
+  /** The shared guest office anyone can walk into (as opposed to a team's own workspace). */
+  demo?: boolean;
 }
 
 /** The message on the meeting room whiteboard. */
@@ -188,13 +190,35 @@ export interface OfficeActions {
   removePhoto(photoId: string): Promise<ActionResult>;
 }
 
+/** Someone signed in with an account, before they're in a workspace. */
+export interface Account {
+  userId: string;
+  email: string | null;
+  /** Their name and pookie, once they've set them up. */
+  profile: GuestProfile | null;
+}
+
 /** Where this browser stands with the office. */
 export type OfficeConnection =
   | { phase: "loading" }
-  /** Nobody is signed in (or they are not in a workspace yet). */
+  /** Nobody is signed in (or a guest who hasn't picked a name yet). */
   | { phase: "signed-out" }
+  /** Signed in with an account, but not in a workspace yet: create one or join one. */
+  | { phase: "setup"; account: Account }
   | { phase: "error"; message: string }
   | { phase: "ready"; state: OfficeState };
+
+/** What an invite link is for, shown before you join. */
+export interface InvitePreview {
+  workspaceName: string;
+  memberCount: number;
+}
+
+export interface SignUpInput {
+  email: string;
+  password: string;
+  profile: GuestProfile;
+}
 
 export interface GuestProfile {
   displayName: string;
@@ -203,9 +227,20 @@ export interface GuestProfile {
 }
 
 export interface SessionActions {
-  /** Step into the shared demo office without an account (development only). */
+  /** Step into the shared demo office without an account. */
   enterAsGuest(profile: GuestProfile): Promise<ActionResult>;
-  /** Leave the office and sign out. */
+  /** Make an account (email and password) with your name and pookie. */
+  signUp(input: SignUpInput): Promise<ActionResult>;
+  signIn(email: string, password: string): Promise<ActionResult>;
+  /** Signed in without a profile yet (sign-up was interrupted): save your name and pookie. */
+  saveProfile(profile: GuestProfile): Promise<ActionResult>;
+  /** Signed in without a workspace: start one, and become its admin. */
+  createWorkspace(name: string): Promise<ActionResult>;
+  /** Signed in without a workspace: join one with an invite link's token. */
+  acceptInvite(token: string): Promise<ActionResult>;
+  /** Which workspace an invite link is for, or null if the link doesn't work. */
+  previewInvite(token: string): Promise<InvitePreview | null>;
+  /** Leave the office and sign out (guests also give up their seat in the demo office). */
   leave(): Promise<void>;
   /** Try connecting again after an error. */
   retry(): void;

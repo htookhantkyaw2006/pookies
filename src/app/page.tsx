@@ -37,7 +37,7 @@ export default function LandingPage() {
       <header className="flex items-center justify-between py-5">
         <Logo />
         <Link href="/login" className={buttonClass("secondary", "sm")}>
-          Sign in
+          Log in
         </Link>
       </header>
 
@@ -54,12 +54,15 @@ export default function LandingPage() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/office" className={buttonClass("primary", "lg")}>
-            Step into the office
+          <Link href="/signup" className={buttonClass("primary", "lg")}>
+            Start your office
             <ArrowRight aria-hidden="true" className="size-5" />
           </Link>
           <Link href="/login" className={buttonClass("secondary", "lg")}>
-            Sign in
+            Log in
+          </Link>
+          <Link href="/office" className={buttonClass("ghost", "lg")}>
+            Try the demo office
           </Link>
         </div>
 

@@ -1,28 +1,21 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { LogIn } from "lucide-react";
-import { EntryFrame, PreviewNote } from "@/components/entry/EntryFrame";
-import { buttonClass } from "@/components/ui/controls";
+import { Suspense } from "react";
+import { LogInForm } from "@/components/entry/AuthForms";
+import { EntryFrame } from "@/components/entry/EntryFrame";
+import { EntryLoading } from "@/components/entry/EntryLoading";
+import { OfficeProvider } from "@/lib/data/react";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = { title: "Log in" };
 
 export default function LoginPage() {
   return (
     <EntryFrame>
-      <h1 className="text-3xl font-semibold tracking-tight text-ink">Welcome in</h1>
-      <p className="mt-2 text-[15px] font-semibold text-ink-soft">
-        Sign in with your Google account. New here? The same button creates your account.
-      </p>
-
-      <Link href="/onboarding" className={`${buttonClass("primary", "lg")} mt-6 w-full`}>
-        <LogIn aria-hidden="true" className="size-5" />
-        Continue with Google
-      </Link>
-
-      <PreviewNote>
-        Sign-in isn&apos;t connected in this preview. The button takes you straight to the next
-        step.
-      </PreviewNote>
+      {/* Where to go afterwards comes from the address (?next=), so it resolves inside Suspense. */}
+      <Suspense fallback={<EntryLoading />}>
+        <OfficeProvider>
+          <LogInForm />
+        </OfficeProvider>
+      </Suspense>
     </EntryFrame>
   );
 }

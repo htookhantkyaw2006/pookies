@@ -381,9 +381,24 @@ export const mockStore: OfficeStore = {
   getSnapshot,
   getServerSnapshot: () => LOADING,
   actions,
-  // The sample office has no accounts and nobody else's browser to talk to.
+  // The sample office has no accounts and nobody else's browser to talk to:
+  // you're always signed in, so these just let you through.
   session: {
     enterAsGuest: async () => OK,
+    signUp: async () => OK,
+    signIn: async () => OK,
+    saveProfile: async () => OK,
+    createWorkspace: async (name) => {
+      const valid = validateName(name, "Workspace name", WORKSPACE_NAME_MAX);
+      if (!valid.ok) return valid;
+      commit((current) => ({ ...current, workspace: { ...current.workspace, name: cleanLine(name, WORKSPACE_NAME_MAX) } }));
+      return OK;
+    },
+    acceptInvite: async () => OK,
+    previewInvite: async () => {
+      const current = getState();
+      return { workspaceName: current.workspace.name, memberCount: current.members.length };
+    },
     leave: async () => {},
     retry: () => {},
   },

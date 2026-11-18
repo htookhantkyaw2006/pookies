@@ -121,6 +121,23 @@ export function randomPose(random: () => number = Math.random): PhotoPose {
   return PHOTO_POSES[Math.floor(random() * PHOTO_POSES.length)];
 }
 
+export const PASSWORD_MIN = 8;
+
+export function validateEmail(email: string): ActionResult {
+  const cleaned = email.trim();
+  if (cleaned.length === 0) return fail("Add your email address.");
+  if (cleaned.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)) {
+    return fail("That doesn't look like an email address.");
+  }
+  return OK;
+}
+
+export function validatePassword(password: string): ActionResult {
+  if (password.length < PASSWORD_MIN) return fail(`Use at least ${PASSWORD_MIN} characters for your password.`);
+  if (password.length > 72) return fail("Keep your password to 72 characters or fewer.");
+  return OK;
+}
+
 /** Single line, no leading/trailing space, capped in length. */
 export function cleanLine(value: string, max: number): string {
   return value.replace(/\s+/g, " ").trim().slice(0, max);

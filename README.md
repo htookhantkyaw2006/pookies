@@ -45,9 +45,21 @@ Pookies runs in one of two modes, chosen by `.env.local` (see [.env.example](.en
 | Sample office | No Supabase values, or `NEXT_PUBLIC_DATA_SOURCE=sample` | Pretend teammates who wander about. Nothing is saved. Good for looking at the design |
 | Live office | Supabase URL and publishable key are set | The real thing: other browsers see you walk, change status and check in |
 
-### Live office: guest mode
+### Live office: accounts and workspaces
 
-Until Google sign-in is added, the live office lets people in as guests: pick a name, step into one shared demo office. This needs **anonymous sign-ins** switched on in the Supabase project (Authentication → Sign In / Providers → Allow anonymous sign-ins). Guest mode is for development; it is switched off before launch.
+1. **Sign up** (`/signup`) with your name, a pookie, an email and a password.
+2. **Start your office**: name your workspace. You're its admin.
+3. **Invite friends**: Admin → *New invite link*, then send it. Links last 7 days and can be switched off.
+4. Friends open the link, see which office it's for, **sign up to join** (or log in), and walk straight in. Everyone in the workspace sees each other live.
+
+Each account belongs to one workspace for now. Sign out is on the Profile page.
+
+There's also a **demo office** (`/office`, "Try the demo office") that anyone can walk into as a guest with just a name. It's one shared office; guests leave no trace when they go.
+
+Supabase settings this relies on (Authentication → Sign In / Providers):
+
+- **Allow anonymous sign-ins**: on, for the demo office.
+- **Confirm email**: off, so accounts work straight away. Supabase's built-in mailer only sends a couple of emails an hour; to turn confirmation back on, set up your own email sender first (Authentication → Emails → SMTP).
 
 ## What's where
 
@@ -83,7 +95,7 @@ npm test
 npm run test:e2e
 ```
 
-`npm run test:e2e` needs the live office with guest mode on; it skips itself with a message otherwise. If your dev server shows the sample office, build a live copy on another port and point the test at it:
+`npm run test:e2e` needs the live office with guest mode on; it skips itself with a message otherwise. The account test (`e2e/accounts.spec.ts`: sign up, start an office, invite a friend, see each other live) makes real accounts, so it only runs with `E2E_ACCOUNTS=1`; afterwards, delete the users whose email starts with `pookies-test-` and their `Test Office …` workspace. If your dev server shows the sample office, build a live copy on another port and point the test at it:
 
 ```bash
 NEXT_PUBLIC_DATA_SOURCE=live npx next build && npx next start -p 3001

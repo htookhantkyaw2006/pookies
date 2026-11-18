@@ -328,6 +328,19 @@ export type Database = {
       leave_demo_workspace: { Args: never; Returns: undefined };
       pin_photo: { Args: { p_backdrop: string; p_people: string[] }; Returns: string };
       remove_photo: { Args: { p_photo: string }; Returns: undefined };
+      save_profile: {
+        Args: {
+          p_avatar_color: string;
+          p_avatar_shape: string;
+          p_display_name: string;
+          p_timezone: string;
+        };
+        Returns: undefined;
+      };
+      invite_preview: {
+        Args: { p_token: string };
+        Returns: { member_count: number; workspace_name: string }[];
+      };
       remove_member: { Args: { p_user_id: string }; Returns: undefined };
       revoke_invite: { Args: { p_invite_id: string }; Returns: undefined };
       save_check_in: {

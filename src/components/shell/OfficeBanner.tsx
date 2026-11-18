@@ -24,11 +24,18 @@ export function OfficeBanner() {
 
 function LiveBanner() {
   const session = useSession();
+  const { state } = useOffice();
+  // A team's own workspace needs no banner; sign out lives on the Profile page.
+  if (!state.workspace.demo) return null;
   return (
     <div className={stripClass}>
       <p className="flex items-center gap-2 font-semibold text-brand-ink">
         <Radio aria-hidden="true" className="size-4 shrink-0" />
-        Live demo office. Open this page in another browser to walk in as someone else.
+        The shared demo office: anyone with the link can walk in.{" "}
+        <a href="/signup" className="underline">
+          Make an account
+        </a>{" "}
+        for your own team&apos;s office.
       </p>
       <button
         type="button"

@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { Check } from "lucide-react";
-import { useOffice } from "@/lib/data/react";
+import { Check, LogOut } from "lucide-react";
+import { officeKind, useOffice, useSession } from "@/lib/data/react";
 import { NAME_MAX } from "@/lib/data/rules";
 import type { AvatarColor, AvatarShape } from "@/lib/data/types";
 import { clockInZone } from "@/lib/dates";
@@ -12,6 +12,7 @@ import { PookieAvatar } from "@/components/ui/PookieAvatar";
 
 export function ProfileScreen() {
   const { state, me, actions } = useOffice();
+  const session = useSession();
   const [displayName, setDisplayName] = useState(me.displayName);
   const [color, setColor] = useState<AvatarColor>(me.avatar.color);
   const [shape, setShape] = useState<AvatarShape>(me.avatar.shape);
@@ -106,6 +107,18 @@ export function ProfileScreen() {
           </div>
         </Card>
       </form>
+
+      {officeKind === "live" && (
+        <Card className="mt-6 flex flex-wrap items-center justify-between gap-3 p-5">
+          <p className="text-sm font-semibold text-ink-soft">
+            Signed in to {state.workspace.name}.
+          </p>
+          <Button variant="secondary" onClick={() => void session.leave()}>
+            <LogOut aria-hidden="true" className="size-4" />
+            Sign out
+          </Button>
+        </Card>
+      )}
     </div>
   );
 }

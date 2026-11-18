@@ -1,18 +1,15 @@
 import type { Metadata } from "next";
 import { EntryFrame } from "@/components/entry/EntryFrame";
-import { EntryGate } from "@/components/entry/EntryGate";
-import { OnboardingForm } from "@/components/entry/OnboardingForm";
+import { SetupFlow } from "@/components/entry/SetupFlow";
 import { OfficeProvider } from "@/lib/data/react";
 
-export const metadata: Metadata = { title: "Create your workspace" };
+export const metadata: Metadata = { title: "Set up your office" };
 
 export default function OnboardingPage() {
   return (
     <EntryFrame>
       <OfficeProvider>
-        <EntryGate>
-          <OnboardingForm />
-        </EntryGate>
+        <SetupFlow />
       </OfficeProvider>
     </EntryFrame>
   );
