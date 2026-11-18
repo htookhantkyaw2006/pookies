@@ -3,7 +3,6 @@
 import { ShieldCheck } from "lucide-react";
 import { useOffice } from "@/lib/data/react";
 import { Card, PageHeader } from "@/components/ui/controls";
-import { InviteLinks } from "./InviteLinks";
 import { MemberList } from "./MemberList";
 import { WorkspaceNameForm } from "./WorkspaceNameForm";
 
@@ -36,11 +35,10 @@ export function AdminScreen() {
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <PageHeader
         title="Admin"
-        subtitle="Look after the workspace: who's in it, and how people join."
+        subtitle="Look after the office: its name, and who's in it. Friends join with the code at the top of the page."
       />
       <WorkspaceNameForm />
       <MemberList />
-      <InviteLinks />
     </div>
   );
 }

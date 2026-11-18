@@ -2,23 +2,39 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /**
  * The one promise Pookies has to keep: what one person does shows up for
- * everyone else straight away, without a reload. Two separate browsers walk
- * into the demo office as guests and watch each other.
+ * everyone else straight away, without a reload. Ana creates an office, Ben
+ * opens her invite link and joins with a nickname, and they watch each other
+ * in two separate browsers.
  */
 
 const run = Math.random().toString(36).slice(2, 6);
 const ANA = `Ana ${run}`;
 const BEN = `Ben ${run}`;
 
-/** Walks into the demo office as a guest. Returns false if guest mode is off. */
-async function walkIn(page: Page, name: string): Promise<boolean> {
+/** Waits until this person is inside; false if guests are switched off. */
+async function inside(page: Page, name: string): Promise<boolean> {
+  const office = page.getByRole("heading", { level: 1, name: new RegExp(`, ${name.split(" ")[0]}$`) });
+  const refused = page.getByText("Guests are switched off");
+  await expect(office.or(refused)).toBeVisible({ timeout: 30_000 });
+  return office.isVisible();
+}
+
+/** Makes a new office as `name`. Returns its code, or null if guests are switched off. */
+async function createOffice(page: Page, name: string): Promise<string | null> {
   await page.goto("/office");
-  await page.getByLabel("Your name").fill(name);
-  await page.getByRole("button", { name: "Walk in" }).click();
-  const inside = page.getByRole("heading", { level: 1, name: new RegExp(`, ${name.split(" ")[0]}$`) });
-  const refused = page.getByText("Guest mode is switched off");
-  await expect(inside.or(refused)).toBeVisible({ timeout: 30_000 });
-  return inside.isVisible();
+  await page.getByLabel("Your nickname").fill(name);
+  await page.getByRole("button", { name: "Create a new office" }).click();
+  if (!(await inside(page, name))) return null;
+  return page.locator("[data-office-code]").getAttribute("data-office-code");
+}
+
+/** Opens a shared invite link and joins as `name`. */
+async function joinOffice(page: Page, name: string, code: string): Promise<void> {
+  await page.goto(`/join/${code}`);
+  await expect(page.getByLabel("Office code")).toHaveValue(code);
+  await page.getByLabel("Your nickname").fill(name);
+  await page.getByRole("button", { name: "Join", exact: true }).click();
+  await inside(page, name);
 }
 
 /** Closes any popover so the next click lands on the map. */
@@ -27,10 +43,10 @@ async function closePopovers(page: Page): Promise<void> {
 }
 
 async function leave(page: Page): Promise<void> {
-  const button = page.getByRole("button", { name: "Leave the office" });
+  const button = page.getByRole("button", { name: "Leave office" });
   if (await button.isVisible().catch(() => false)) {
     await button.click();
-    await expect(page.getByLabel("Your name")).toBeVisible();
+    await expect(page.getByLabel("Your nickname")).toBeVisible();
   }
 }
 
@@ -63,9 +79,10 @@ test("two people see each other's presence, movement and check-ins live", async 
   const ben = await benContext.newPage();
 
   try {
-    const guestModeOn = await walkIn(ana, ANA);
-    test.skip(!guestModeOn, "Guest mode is off: turn on anonymous sign-ins in Supabase to run this.");
-    await walkIn(ben, BEN);
+    const code = await createOffice(ana, ANA);
+    test.skip(!code, "Guests are off: turn on anonymous sign-ins in Supabase to run this.");
+    expect(code).toMatch(/^[A-Z2-9]{6}$/);
+    await joinOffice(ben, BEN, code!);
 
     await test.step("each sees the other arrive, online", async () => {
       await expect(personRow(ana, BEN)).toContainText("Online");

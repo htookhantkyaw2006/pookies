@@ -1,6 +1,7 @@
 "use client";
 
-import { DoorOpen, Radio, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Check, DoorOpen, Link2, Radio, Sparkles } from "lucide-react";
 import { officeKind, useOffice, useSession } from "@/lib/data/react";
 import { previewAsRole } from "@/lib/data/mock/store";
 import type { Role } from "@/lib/data/types";
@@ -14,9 +15,9 @@ const stripClass =
   "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-brand-soft/70 px-4 py-2 text-sm sm:px-6 lg:px-8";
 
 /**
- * The strip across the top of the app while Pookies has no real accounts.
- * Sample office: says the data is made up and lets you flip between the admin
- * and member views. Live demo office: says it's shared, and lets you leave.
+ * The strip across the top of the app. Live office: its code to share, a
+ * copy-link button, and the way out. Sample office: says the data is made up
+ * and lets you flip between the admin and member views.
  */
 export function OfficeBanner() {
   return officeKind === "live" ? <LiveBanner /> : <SampleBanner />;
@@ -25,29 +26,58 @@ export function OfficeBanner() {
 function LiveBanner() {
   const session = useSession();
   const { state } = useOffice();
-  // A team's own workspace needs no banner; sign out lives on the Profile page.
-  if (!state.workspace.demo) return null;
+  const [copied, setCopied] = useState(false);
+  const code = state.workspace.code;
+
+  const copy = async () => {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/join/${code}`);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked: the code is on screen to read out instead.
+    }
+  };
+
   return (
     <div className={stripClass}>
-      <p className="flex items-center gap-2 font-semibold text-brand-ink">
-        <Radio aria-hidden="true" className="size-4 shrink-0" />
-        The shared demo office: anyone with the link can walk in.{" "}
-        <a href="/signup" className="underline">
-          Make an account
-        </a>{" "}
-        for your own team&apos;s office.
-      </p>
-      <button
-        type="button"
-        onClick={() => void session.leave()}
-        className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-brand/25 bg-surface px-3 text-xs font-bold text-brand-ink transition-colors hover:bg-brand-soft"
-      >
-        <DoorOpen aria-hidden="true" className="size-4" />
-        Leave the office
-      </button>
+      {code ? (
+        <p className="flex flex-wrap items-center gap-2 font-semibold text-brand-ink">
+          <Radio aria-hidden="true" className="size-4 shrink-0" />
+          Office code
+          <span
+            data-office-code={code}
+            className="rounded-lg bg-surface px-2 py-0.5 font-mono text-base font-bold tracking-[0.2em] text-ink"
+          >
+            {code}
+          </span>
+          <span className="text-ink-soft">Share it so friends can join.</span>
+        </p>
+      ) : (
+        <p className="flex items-center gap-2 font-semibold text-brand-ink">
+          <Radio aria-hidden="true" className="size-4 shrink-0" />
+          The shared demo office: anyone with the link can walk in.
+        </p>
+      )}
+      <div className="flex items-center gap-2">
+        {code && (
+          <button type="button" onClick={() => void copy()} className={chipClass}>
+            {copied ? <Check aria-hidden="true" className="size-4" /> : <Link2 aria-hidden="true" className="size-4" />}
+            {copied ? "Link copied" : "Copy invite link"}
+          </button>
+        )}
+        <button type="button" onClick={() => void session.leave()} className={chipClass}>
+          <DoorOpen aria-hidden="true" className="size-4" />
+          Leave office
+        </button>
+      </div>
     </div>
   );
 }
+
+const chipClass =
+  "inline-flex min-h-8 items-center gap-1.5 rounded-full border border-brand/25 bg-surface px-3 text-xs font-bold text-brand-ink transition-colors hover:bg-brand-soft";
 
 function SampleBanner() {
   const { me } = useOffice();

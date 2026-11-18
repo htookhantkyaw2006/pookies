@@ -36,8 +36,8 @@ export default function LandingPage() {
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 sm:px-6">
       <header className="flex items-center justify-between py-5">
         <Logo />
-        <Link href="/login" className={buttonClass("secondary", "sm")}>
-          Log in
+        <Link href="/office" className={buttonClass("secondary", "sm")}>
+          Join with a code
         </Link>
       </header>
 
@@ -54,15 +54,9 @@ export default function LandingPage() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/signup" className={buttonClass("primary", "lg")}>
-            Start your office
+          <Link href="/office" className={buttonClass("primary", "lg")}>
+            Create or join an office
             <ArrowRight aria-hidden="true" className="size-5" />
-          </Link>
-          <Link href="/login" className={buttonClass("secondary", "lg")}>
-            Log in
-          </Link>
-          <Link href="/office" className={buttonClass("ghost", "lg")}>
-            Try the demo office
           </Link>
         </div>
 

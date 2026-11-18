@@ -43,23 +43,20 @@ Pookies runs in one of two modes, chosen by `.env.local` (see [.env.example](.en
 | Mode | When | What you get |
 |---|---|---|
 | Sample office | `NEXT_PUBLIC_DATA_SOURCE=sample` | Pretend teammates who wander about. Nothing is saved. Good for looking at the design |
-| Live office | Otherwise | The real thing: accounts, workspaces, and other browsers see you walk, change status and check in. Uses the Supabase project in `src/lib/data/supabase/project.ts` (its publishable key is public by design), unless `.env.local` or Vercel set their own |
+| Live office | Otherwise | The real thing: offices you join with a code, and other browsers see you walk, change status and check in. Uses the Supabase project in `src/lib/data/supabase/project.ts` (its publishable key is public by design), unless `.env.local` or Vercel set their own |
 
-### Live office: accounts and workspaces
+### Getting in: nickname, pookie, office code
 
-1. **Sign up** (`/signup`) with your name, a pookie, an email and a password.
-2. **Start your office**: name your workspace. You're its admin.
-3. **Invite friends**: Admin → *New invite link*, then send it. Links last 7 days and can be switched off.
-4. Friends open the link, see which office it's for, **sign up to join** (or log in), and walk straight in. Everyone in the workspace sees each other live.
+No accounts. Like a party game:
 
-Each account belongs to one workspace for now. Sign out is on the Profile page.
+1. Open the site, type a **nickname** and pick a **pookie**.
+2. **Create a new office**: you get a six-letter code like `PKX4QZ` (shown at the top of the office) and you're its admin.
+3. Send friends the code, or the invite link (**Copy invite link** at the top: `…/join/PKX4QZ` opens the door with the code filled in).
+4. They type a nickname, pick a pookie and press **Join**. Everyone in the office sees each other live.
 
-There's also a **demo office** (`/office`, "Try the demo office") that anyone can walk into as a guest with just a name. It's one shared office; guests leave no trace when they go.
+Your browser remembers you, so coming back drops you straight into your office. **Leave office** (top strip, or the Profile page) takes your name out; when the last person leaves, the office is deleted. An office holds up to 25 people.
 
-Supabase settings this relies on (Authentication → Sign In / Providers):
-
-- **Allow anonymous sign-ins**: on, for the demo office.
-- **Confirm email**: off, so accounts work straight away. Supabase's built-in mailer only sends a couple of emails an hour; to turn confirmation back on, set up your own email sender first (Authentication → Emails → SMTP).
+Under the hood everyone is a Supabase anonymous (guest) user, so **Allow anonymous sign-ins** must be on (Authentication → Sign In / Providers).
 
 ## What's where
 
@@ -95,7 +92,7 @@ npm test
 npm run test:e2e
 ```
 
-`npm run test:e2e` needs the live office with guest mode on; it skips itself with a message otherwise. The account test (`e2e/accounts.spec.ts`: sign up, start an office, invite a friend, see each other live) makes real accounts, so it only runs with `E2E_ACCOUNTS=1`; afterwards, delete the users whose email starts with `pookies-test-` and their `Test Office …` workspace. If your dev server shows the sample office, build a live copy on another port and point the test at it:
+`npm run test:e2e` (one person creates an office, another joins by its invite link, and they watch each other live) needs the live office with anonymous sign-ins on; it skips itself with a message otherwise. If your dev server shows the sample office, build a live copy on another port and point the test at it:
 
 ```bash
 NEXT_PUBLIC_DATA_SOURCE=live npx next build && npx next start -p 3001

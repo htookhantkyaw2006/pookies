@@ -111,11 +111,11 @@ export function ProfileScreen() {
       {officeKind === "live" && (
         <Card className="mt-6 flex flex-wrap items-center justify-between gap-3 p-5">
           <p className="text-sm font-semibold text-ink-soft">
-            Signed in to {state.workspace.name}.
+            Leaving takes you out of {state.workspace.name}. Come back any time with its code.
           </p>
           <Button variant="secondary" onClick={() => void session.leave()}>
             <LogOut aria-hidden="true" className="size-4" />
-            Sign out
+            Leave office
           </Button>
         </Card>
       )}

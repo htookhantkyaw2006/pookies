@@ -266,6 +266,7 @@ export type Database = {
           created_by: string | null;
           id: string;
           is_demo: boolean;
+          join_code: string | null;
           name: string;
           plants: Json;
         };
@@ -341,6 +342,21 @@ export type Database = {
         Args: { p_token: string };
         Returns: { member_count: number; workspace_name: string }[];
       };
+      create_room: {
+        Args: { p_avatar_color: string; p_avatar_shape: string; p_display_name: string; p_timezone: string };
+        Returns: string;
+      };
+      join_room: {
+        Args: {
+          p_avatar_color: string;
+          p_avatar_shape: string;
+          p_code: string;
+          p_display_name: string;
+          p_timezone: string;
+        };
+        Returns: string;
+      };
+      leave_room: { Args: never; Returns: undefined };
       remove_member: { Args: { p_user_id: string }; Returns: undefined };
       revoke_invite: { Args: { p_invite_id: string }; Returns: undefined };
       save_check_in: {

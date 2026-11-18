@@ -121,20 +121,22 @@ export function randomPose(random: () => number = Math.random): PhotoPose {
   return PHOTO_POSES[Math.floor(random() * PHOTO_POSES.length)];
 }
 
-export const PASSWORD_MIN = 8;
+/** Office codes: six letters and digits that can't be mixed up (no 0/O, 1/I/L). */
+export const CODE_LENGTH = 6;
+const CODE_LETTERS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
-export function validateEmail(email: string): ActionResult {
-  const cleaned = email.trim();
-  if (cleaned.length === 0) return fail("Add your email address.");
-  if (cleaned.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)) {
-    return fail("That doesn't look like an email address.");
-  }
-  return OK;
+/** Tidies a typed or pasted code: capitals, no spaces or dashes; finds it inside a pasted link. */
+export function cleanCode(text: string): string {
+  const fromLink = text.match(/\/join\/([A-Za-z0-9-]+)/);
+  return (fromLink ? fromLink[1] : text).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, CODE_LENGTH);
 }
 
-export function validatePassword(password: string): ActionResult {
-  if (password.length < PASSWORD_MIN) return fail(`Use at least ${PASSWORD_MIN} characters for your password.`);
-  if (password.length > 72) return fail("Keep your password to 72 characters or fewer.");
+export function validateCode(code: string): ActionResult {
+  const cleaned = cleanCode(code);
+  if (cleaned.length === 0) return fail("Type the office code your friend sent you.");
+  if (cleaned.length < CODE_LENGTH || [...cleaned].some((letter) => !CODE_LETTERS.includes(letter))) {
+    return fail(`Office codes are ${CODE_LENGTH} letters and numbers, like PKX4QZ.`);
+  }
   return OK;
 }
 
