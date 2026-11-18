@@ -4,6 +4,8 @@ A light, friendly virtual office for small remote teams. You walk a little chara
 
 The product brief and the decisions made so far are in [POOKIES_BRIEF.md](POOKIES_BRIEF.md).
 
+**Live:** https://pookies-nine.vercel.app (deployed on Vercel from `main`; every push to `main` redeploys it). Open it, type a name and walk into the shared office as a guest.
+
 ## The office
 
 Walk up to anything and press **F** (or tap the button that appears) to use it. Where you are sets your status: rooms marked Away or Busy below change it for you.
