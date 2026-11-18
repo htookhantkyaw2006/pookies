@@ -133,7 +133,7 @@ export function WorldStage3D({
   }), []);
 
   return (
-    <div ref={containerRef} className="absolute inset-0 bg-[#5b4a63]">
+    <div ref={containerRef} className="absolute inset-0 isolate bg-[#5b4a63]">
       <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 block size-full" />
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {room.map((entry) => (

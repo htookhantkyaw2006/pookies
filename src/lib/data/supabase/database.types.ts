@@ -63,6 +63,38 @@ export type Database = {
           },
         ];
       };
+      game_scores: {
+        Row: {
+          game: string;
+          score: number;
+          scored_at: string;
+          user_id: string;
+          workspace_id: string;
+        };
+        Insert: {
+          game: string;
+          score: number;
+          scored_at?: string;
+          user_id: string;
+          workspace_id: string;
+        };
+        Update: {
+          game?: string;
+          score?: number;
+          scored_at?: string;
+          user_id?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "game_scores_workspace_id_user_id_fkey";
+            columns: ["workspace_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace_members";
+            referencedColumns: ["workspace_id", "user_id"];
+          },
+        ];
+      };
       invites: {
         Row: {
           created_at: string;
@@ -104,6 +136,48 @@ export type Database = {
           },
           {
             foreignKeyName: "invites_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      photos: {
+        Row: {
+          backdrop: string;
+          id: string;
+          people: Json;
+          taken_at: string;
+          taken_by: string | null;
+          workspace_id: string;
+        };
+        Insert: {
+          backdrop: string;
+          id?: string;
+          people: Json;
+          taken_at?: string;
+          taken_by?: string | null;
+          workspace_id: string;
+        };
+        Update: {
+          backdrop?: string;
+          id?: string;
+          people?: Json;
+          taken_at?: string;
+          taken_by?: string | null;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "photos_taken_by_fkey";
+            columns: ["taken_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "photos_workspace_id_fkey";
             columns: ["workspace_id"];
             isOneToOne: false;
             referencedRelation: "workspaces";
@@ -252,6 +326,8 @@ export type Database = {
         Returns: string;
       };
       leave_demo_workspace: { Args: never; Returns: undefined };
+      pin_photo: { Args: { p_backdrop: string; p_people: string[] }; Returns: string };
+      remove_photo: { Args: { p_photo: string }; Returns: undefined };
       remove_member: { Args: { p_user_id: string }; Returns: undefined };
       revoke_invite: { Args: { p_invite_id: string }; Returns: undefined };
       save_check_in: {
@@ -265,6 +341,7 @@ export type Database = {
         };
         Returns: undefined;
       };
+      submit_score: { Args: { p_game: string; p_score: number }; Returns: undefined };
       water_plant: { Args: { p_plant: string }; Returns: undefined };
       write_board: { Args: { p_text: string }; Returns: undefined };
     };

@@ -13,6 +13,13 @@ import {
   cleanText,
   validateCheckIn,
   validateName,
+  canRemovePhoto,
+  randomPose,
+  validatePhoto,
+  validateScore,
+  withPhoto,
+  withScore,
+  PHOTO_GAP_MS,
 } from "../rules";
 import type {
   ActionResult,
@@ -225,6 +232,18 @@ const actions: OfficeActions = {
       members: s.members.filter((m) => m.id !== userId),
       presence: s.presence.filter((entry) => entry.userId !== userId),
       checkIns: s.checkIns.filter((c) => c.userId !== userId),
+      things: {
+        ...s.things,
+        scores: s.things.scores.filter((score) => score.userId !== userId),
+        // Someone who leaves is taken out of the photos (a photo of only them goes).
+        photos: s.things.photos
+          .map((photo) => ({
+            ...photo,
+            takenBy: photo.takenBy === userId ? null : photo.takenBy,
+            people: photo.people.filter((person) => person.id !== userId),
+          }))
+          .filter((photo) => photo.people.length > 0),
+      },
     }));
     return OK;
   },
@@ -284,6 +303,65 @@ const actions: OfficeActions = {
     }));
     return OK;
   },
+
+  async pinPhoto(backdrop, peopleIds) {
+    const current = getState();
+    const valid = validatePhoto(backdrop, peopleIds, current.currentUserId, current.members);
+    if (!valid.ok) return valid;
+    const mine = current.things.photos.find((photo) => photo.takenBy === current.currentUserId);
+    if (mine && current.now - mine.takenAt < PHOTO_GAP_MS) {
+      return { ok: false, error: "One photo at a time! Try again in a moment." };
+    }
+    commit((s) => ({
+      ...s,
+      things: {
+        ...s.things,
+        photos: withPhoto(s.things.photos, {
+          id: crypto.randomUUID(),
+          takenAt: Date.now(),
+          takenBy: s.currentUserId,
+          backdrop,
+          people: peopleIds.map((id) => {
+            const member = s.members.find((m) => m.id === id)!;
+            return { id, name: member.displayName, avatar: member.avatar, pose: randomPose() };
+          }),
+        }),
+      },
+    }));
+    return OK;
+  },
+
+  async removePhoto(photoId) {
+    const current = getState();
+    const photo = current.things.photos.find((item) => item.id === photoId);
+    if (!photo) return OK;
+    if (!canRemovePhoto(photo, current.currentUserId, isAdmin(current))) {
+      return { ok: false, error: "Only people in the photo can take it down." };
+    }
+    commit((s) => ({
+      ...s,
+      things: { ...s.things, photos: s.things.photos.filter((item) => item.id !== photoId) },
+    }));
+    return OK;
+  },
+
+  async submitScore(game, score) {
+    const valid = validateScore(game, score);
+    if (!valid.ok) return valid;
+    commit((current) => ({
+      ...current,
+      things: {
+        ...current.things,
+        scores: withScore(current.things.scores, {
+          game,
+          userId: current.currentUserId,
+          score,
+          at: current.now,
+        }),
+      },
+    }));
+    return OK;
+  },
 };
 
 function isAdmin(current: OfficeState): boolean {
@@ -314,6 +392,7 @@ export const mockStore: OfficeStore = {
     sendPosition: () => true,
     sendWave: () => {},
     sendEmote: () => {},
+    sendSnap: () => {},
     subscribe: () => () => {},
   },
 };

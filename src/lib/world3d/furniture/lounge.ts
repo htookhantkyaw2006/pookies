@@ -78,10 +78,12 @@ export function buildFloorLamp(item: Furniture): Group {
   const cz = z + 0.5;
   const light = new PointLight("#ffd9a0", 1.1, 4, 2);
   light.position.set(cx, 1.3, cz);
+  // Brighter after dark (the stage scales it with the time of day).
+  light.userData.nightLight = 1.1;
   return group(
     cyl(0.17, 0.2, 0.04, COLORS.dark, cx, 0.02, cz, 18),
     cyl(0.018, 0.018, 1.0, COLORS.dark, cx, 0.52, cz, 8),
-    cyl(0.16, 0.24, 0.26, "#fff4d6", cx, 1.1, cz, 20, { emissive: "#ffe2a8", glow: 0.75 }),
+    cyl(0.16, 0.24, 0.26, "#fff4d6", cx, 1.1, cz, 20, { emissive: "#ffe2a8", glow: 1.1, when: "night" }),
     light,
   );
 }

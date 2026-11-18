@@ -3,7 +3,22 @@
  * Off until someone turns them on; the choice is remembered in this browser.
  */
 
-export type SoundName = "step" | "sit" | "stand" | "coffee" | "water" | "wave" | "marker" | "on";
+export type SoundName =
+  | "step"
+  | "sit"
+  | "stand"
+  | "coffee"
+  | "water"
+  | "wave"
+  | "marker"
+  | "on"
+  | "calm"
+  | "catch"
+  | "oops"
+  | "dart"
+  | "cheer"
+  | "tick"
+  | "shutter";
 
 const STORAGE_KEY = "pookies-sound";
 const MASTER_VOLUME = 0.5;
@@ -152,6 +167,35 @@ export function playSound(name: SoundName): void {
     case "marker":
       hiss(ctx, out, { length: 0.18, volume: 0.04, filter: "highpass", frequency: 3200 });
       hiss(ctx, out, { at: 0.22, length: 0.14, volume: 0.035, filter: "highpass", frequency: 3600 });
+      break;
+    case "calm":
+      // A soft, slow chord: lying down, breathing.
+      tone(ctx, out, { from: 392, length: 1.6, volume: 0.05 });
+      tone(ctx, out, { from: 494, at: 0.15, length: 1.5, volume: 0.04 });
+      tone(ctx, out, { from: 587, at: 0.3, length: 1.4, volume: 0.035 });
+      break;
+    case "catch":
+      tone(ctx, out, { from: 700, to: 1050, length: 0.09, volume: 0.07, wave: "triangle" });
+      break;
+    case "oops":
+      tone(ctx, out, { from: 300, to: 180, length: 0.22, volume: 0.08, wave: "square" });
+      break;
+    case "dart":
+      hiss(ctx, out, { length: 0.12, volume: 0.05, filter: "highpass", frequency: 1800 });
+      tone(ctx, out, { from: 160, at: 0.12, length: 0.08, volume: 0.12 });
+      break;
+    case "cheer":
+      // A little rising fanfare for the end of a round.
+      [523, 659, 784, 1047].forEach((from, i) =>
+        tone(ctx, out, { from, at: i * 0.09, length: 0.22, volume: 0.06, wave: "triangle" }),
+      );
+      break;
+    case "tick":
+      tone(ctx, out, { from: 880, length: 0.08, volume: 0.06, wave: "triangle" });
+      break;
+    case "shutter":
+      hiss(ctx, out, { length: 0.05, volume: 0.09, filter: "highpass", frequency: 2600 });
+      hiss(ctx, out, { at: 0.07, length: 0.08, volume: 0.07, filter: "bandpass", frequency: 1400 });
       break;
     case "on":
       tone(ctx, out, { from: 520, length: 0.1, volume: 0.08 });

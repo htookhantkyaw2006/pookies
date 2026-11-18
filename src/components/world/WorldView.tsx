@@ -12,35 +12,61 @@ import {
   type ReactNode,
 } from "react";
 import {
-  Armchair,
   Box,
   CircleHelp,
-  Coffee,
-  Droplets,
   Hand,
   LocateFixed,
   Map as MapIcon,
+  Signpost,
   MapPin,
   Maximize2,
   Minimize2,
   Minus,
-  PenLine,
+  Moon,
   Plus,
+  Sun,
+  SunMoon,
   Volume2,
   Users,
   VolumeX,
-  type LucideIcon,
 } from "lucide-react";
 import { plantMood, type PlantMood } from "@/lib/data/rules";
 import { useOffice, useWorldTransport } from "@/lib/data/react";
 import { buildRoom } from "@/lib/presence/derive";
 import { playSound, setSoundEnabled, soundEnabled, subscribeSound } from "@/lib/sound";
-import { COFFEE_SECONDS, NEAR_DISTANCE, type Nearby, type WorldPerson } from "@/lib/world/engine";
+import { NEAR_DISTANCE, type Nearby, type WorldPerson } from "@/lib/world/engine";
 import { getWorldEngine } from "@/lib/world/instance";
-import { OFFICE_MAP, type Zone } from "@/lib/world/map";
+import {
+  OFFICE_MAP,
+  PHOTO_BOOTH_AREA,
+  TILE,
+  freePersonalRoom,
+  personalRoomMiddle,
+  type Zone,
+} from "@/lib/world/map";
+import { PHOTO_MAX_PEOPLE } from "@/lib/data/rules";
+import type { PhotoBackdrop } from "@/lib/data/types";
 import { STATUS_META } from "@/components/ui/status";
 import type { StageHandle } from "./stage";
 import { getViewMode, setViewMode, subscribeViewMode, supports3D } from "./viewMode";
+import { getSkyMode, nextSkyMode, setSkyMode, subscribeSkyMode, type SkyMode } from "@/lib/world3d/skyMode";
+
+/** What the day/night button says it will switch to next. */
+const SKY_LABELS: Record<SkyMode, string> = {
+  auto: "Sky follows your clock. Switch to day",
+  day: "Daytime. Switch to night",
+  night: "Night-time. Switch back to your clock",
+};
+import { Breathe } from "@/components/calm/Breathe";
+import { describeAction, runAction, type Activity } from "./interactions";
+import { MirrorPanel } from "./MirrorPanel";
+import { Darts } from "@/components/games/Darts";
+import { ScoreBoard } from "@/components/games/ScoreBoard";
+import { SnackCatch } from "@/components/games/SnackCatch";
+import { PhotoBooth } from "@/components/photo/PhotoBooth";
+import { PhotoWall } from "@/components/photo/PhotoWall";
+import { SnapCountdown } from "@/components/photo/SnapCountdown";
+import { PlacesMenu } from "./PlacesMenu";
 import { WhiteboardEditor } from "./Whiteboard";
 import { WorldStage2D } from "./WorldStage2D";
 
@@ -79,18 +105,6 @@ const DRAG_THRESHOLD = 6;
 const ZOOM_STEP = 1.25;
 /** Walking this many pixels makes one footstep. */
 const STRIDE = 46;
-
-const ACTIONS: Record<string, { label: string; icon: LucideIcon }> = {
-  sit: { label: "Sit", icon: Armchair },
-  stand: { label: "Stand up", icon: Armchair },
-  coffee: { label: "Make coffee", icon: Coffee },
-  plant: { label: "Water plant", icon: Droplets },
-  board: { label: "Write on whiteboard", icon: PenLine },
-};
-
-function actionOf(nearby: Nearby): string {
-  return nearby.kind === "thing" ? nearby.thing.kind : nearby.kind;
-}
 
 /** A stable key, so React only hears about it when it changes. */
 function nearbyKey(nearby: Nearby | null): string {
@@ -148,11 +162,25 @@ export function WorldView({
   const [following, setFollowing] = useState(true);
   /** The one thing you could do where you stand: sit, make coffee, water a plant… */
   const [nearby, setNearby] = useState<Nearby | null>(null);
-  const [boardOpen, setBoardOpen] = useState(false);
+  /** A panel opened from something in the office: the whiteboard, the mirror, the breathing guide… */
+  const [activity, setActivity] = useState<Activity | null>(null);
+  const boardOpen = activity === "board";
+  /** While a game is open, the arrow keys and Space belong to it. */
+  const playing = activity === "arcade" || activity === "darts";
+  const isPlaying = useEffectEvent(() => playing);
+  /** A photo booth countdown on screen; `mine` if we pressed the button (and so save the photo). */
+  const [snap, setSnap] = useState<{ key: number; mine: boolean; backdrop: PhotoBackdrop } | null>(null);
+  const [boothSince, setBoothSince] = useState(0);
+  const openActivity = (next: Activity) => {
+    if (next === "booth") setBoothSince(Date.now());
+    setActivity(next);
+  };
   const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [placesOpen, setPlacesOpen] = useState(false);
   const soundOn = useSyncExternalStore(subscribeSound, soundEnabled, () => false);
   const viewMode = useSyncExternalStore(subscribeViewMode, getViewMode, () => "2d" as const);
+  const skyMode = useSyncExternalStore(subscribeSkyMode, getSkyMode, () => "auto" as const);
   const can3D = useSyncExternalStore(noSubscribe, supports3D, () => false);
 
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -211,6 +239,13 @@ export function WorldView({
     engine.sync(people, me.id);
   }, [people, me.id, transport]);
 
+  /** Someone else started the booth countdown: if we're in the booth, we're in the photo too. */
+  const onRemoteSnap = useEffectEvent((backdrop: PhotoBackdrop) => {
+    const engine = getWorldEngine();
+    if (snap || !engine.player || !engine.peopleIn(PHOTO_BOOTH_AREA).includes(engine.player.id)) return;
+    setSnap({ key: Date.now(), mine: false, backdrop });
+  });
+
   // Other browsers: where their people are, and when they wave.
   useEffect(() => {
     announce.current = true;
@@ -227,11 +262,30 @@ export function WorldView({
         }
       } else if (message.type === "emote") {
         engine.showRemoteEmote(message.id, message.emoji, message.hold);
+      } else if (message.type === "snap") {
+        onRemoteSnap(message.backdrop);
       } else {
         announce.current = true; // someone arrived: tell them where we are
       }
     });
   }, [transport]);
+
+  const startSnap = (backdrop: PhotoBackdrop) => {
+    if (snap) return;
+    const engine = getWorldEngine();
+    engine.emote("📸");
+    transport.sendEmote("📸", false);
+    transport.sendSnap(backdrop);
+    setSnap({ key: Date.now(), mine: true, backdrop });
+  };
+
+  /** The flash: everyone in the booth poses, and whoever pressed the button saves the photo. */
+  const onFlash = () => {
+    const engine = getWorldEngine();
+    const inBooth = engine.peopleIn(PHOTO_BOOTH_AREA).slice(0, PHOTO_MAX_PEOPLE);
+    engine.pose(inBooth);
+    if (snap?.mine && inBooth.includes(me.id)) void actions.pinPhoto(snap.backdrop, inBooth);
+  };
 
   const wave = () => {
     getWorldEngine().wave();
@@ -273,33 +327,17 @@ export function WorldView({
     setFollowing(false);
   };
 
-  /** Does whatever is at hand: sit, stand, make coffee, water a plant, write on the board. */
+  /** Does whatever is at hand: sit, stand, make coffee, wash your hands… (see interactions.tsx). */
   const actOnNearby = () => {
     const engine = getWorldEngine();
     const here = engine.nearby();
-    if (!here) return;
-    if (here.kind === "stand") {
-      engine.standUp();
-      playSound("stand");
-    } else if (here.kind === "sit") {
-      if (engine.sit(here.seat.id)) playSound("sit");
-    } else if (here.thing.kind === "coffee") {
-      engine.carry("☕", COFFEE_SECONDS);
-      transport.sendEmote("☕", true);
-      playSound("coffee");
-    } else if (here.thing.kind === "plant") {
-      engine.emote("💧");
-      transport.sendEmote("💧", false);
-      playSound("water");
-      void actions.waterPlant(here.thing.id);
-    } else {
-      setBoardOpen(true);
-    }
+    if (here) runAction(here, { engine, transport, actions, open: openActivity });
   };
   const onActionKey = useEffectEvent(actOnNearby);
   const showNearby = useEffectEvent((next: Nearby | null) => {
     setNearby(next);
-    if (next?.kind !== "thing" || next.thing.kind !== "board") setBoardOpen(false);
+    // Walking away from the thing that opened a panel closes it.
+    setActivity((open) => (open && next?.kind === "thing" && next.thing.kind === open ? open : null));
   });
 
   const recenter = () => {
@@ -415,6 +453,10 @@ export function WorldView({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
+      if (isPlaying()) {
+        release();
+        return;
+      }
       if (event.code in WALK_KEYS) {
         held.add(event.code);
         apply();
@@ -660,6 +702,25 @@ export function WorldView({
           onPointerDown={stop}
           className="absolute bottom-3 left-3 flex flex-col items-start gap-2"
         >
+          {placesOpen && (
+            <PlacesMenu
+              current={zone}
+              onPick={(place) => {
+                const engine = getWorldEngine();
+                let goal = place.spot;
+                if (place.id === "personal") {
+                  // Head for a room nobody else is using.
+                  const others = [...engine.entities.values()]
+                    .filter((entity) => entity !== engine.player && entity.visible)
+                    .map((entity) => ({ x: entity.x / TILE, y: entity.y / TILE }));
+                  goal = personalRoomMiddle(freePersonalRoom(others));
+                }
+                engine.hurryTo(goal.x * TILE, goal.y * TILE);
+                recenter();
+                setPlacesOpen(false);
+              }}
+            />
+          )}
           {helpOpen && (
             <div className="w-64 rounded-2xl border border-line bg-surface/95 p-3 text-xs leading-5 font-semibold text-ink-soft shadow-lift backdrop-blur">
               <p className="mb-1 text-sm font-bold text-ink">How to get around</p>
@@ -676,6 +737,18 @@ export function WorldView({
             </div>
           )}
           <div className="flex overflow-hidden rounded-full bg-surface/95 shadow-lift backdrop-blur">
+            <MapButton
+              label={placesOpen ? "Close places" : "Go to a place"}
+              pressed={placesOpen}
+              onClick={() => {
+                setPlacesOpen((open) => !open);
+                setHelpOpen(false);
+              }}
+              grouped
+            >
+              <Signpost aria-hidden="true" className="size-5" />
+            </MapButton>
+            <span aria-hidden="true" className="my-2.5 w-px bg-line" />
             {can3D && (
               <>
                 <MapButton
@@ -689,6 +762,23 @@ export function WorldView({
                     <Box aria-hidden="true" className="size-5" />
                   )}
                 </MapButton>
+                {/* Day and night only show in the 3D office. */}
+                {viewMode === "3d" && (
+                  <MapButton
+                    label={SKY_LABELS[skyMode]}
+                    pressed={skyMode !== "auto"}
+                    onClick={() => setSkyMode(nextSkyMode(skyMode))}
+                    grouped
+                  >
+                    {skyMode === "day" ? (
+                      <Sun aria-hidden="true" className="size-5" />
+                    ) : skyMode === "night" ? (
+                      <Moon aria-hidden="true" className="size-5" />
+                    ) : (
+                      <SunMoon aria-hidden="true" className="size-5" />
+                    )}
+                  </MapButton>
+                )}
                 <span aria-hidden="true" className="my-2.5 w-px bg-line" />
               </>
             )}
@@ -732,7 +822,10 @@ export function WorldView({
             <MapButton
               label={helpOpen ? "Hide controls help" : "How to get around"}
               pressed={helpOpen}
-              onClick={() => setHelpOpen((open) => !open)}
+              onClick={() => {
+                setHelpOpen((open) => !open);
+                setPlacesOpen(false);
+              }}
               grouped
             >
               <CircleHelp aria-hidden="true" className="size-5" />
@@ -740,7 +833,7 @@ export function WorldView({
           </div>
         </div>
 
-        {boardOpen && (
+        {activity === "board" && (
           <WhiteboardEditor
             board={state.things.board}
             onSave={async (text) => {
@@ -748,17 +841,32 @@ export function WorldView({
               if (result.ok) playSound("marker");
               return result;
             }}
-            onClose={() => setBoardOpen(false)}
+            onClose={() => setActivity(null)}
           />
         )}
+        {activity === "mirror" && <MirrorPanel onClose={() => setActivity(null)} />}
+        {activity === "breathe" && <Breathe onClose={() => setActivity(null)} />}
+        {activity === "arcade" && <SnackCatch onClose={() => setActivity(null)} />}
+        {activity === "darts" && <Darts onClose={() => setActivity(null)} />}
+        {activity === "scores" && <ScoreBoard onClose={() => setActivity(null)} />}
+        {activity === "booth" && (
+          <PhotoBooth
+            onClose={() => setActivity(null)}
+            onSnap={startSnap}
+            snapping={snap !== null}
+            since={boothSince}
+          />
+        )}
+        {activity === "photos" && <PhotoWall onClose={() => setActivity(null)} />}
+        {snap && <SnapCountdown key={snap.key} onFlash={onFlash} onDone={() => setSnap(null)} />}
 
         {/* Bottom centre (of the open floor): what you can do right here. */}
         <div
           data-hud
           onPointerDown={stop}
-          className="absolute right-3 bottom-3 flex max-w-[calc(100%-5rem)] flex-wrap items-center justify-end gap-2 md:right-auto md:left-[calc((100%-var(--panel,0rem))/2)] md:-translate-x-1/2 md:flex-nowrap md:justify-center"
+          className="absolute right-3 bottom-[4.25rem] flex max-w-[calc(100%-1.5rem)] flex-wrap items-center justify-end gap-2 md:right-auto md:bottom-3 md:left-[calc((100%-var(--panel,0rem))/2)] md:-translate-x-1/2 md:flex-nowrap md:justify-center"
         >
-          {nearby && !boardOpen && <ActionButton action={actionOf(nearby)} onClick={actOnNearby} />}
+          {nearby && !activity && <ActionButton nearby={nearby} onClick={actOnNearby} />}
           {!following && (
             <button
               type="button"
@@ -786,8 +894,8 @@ export function WorldView({
   );
 }
 
-function ActionButton({ action, onClick }: { action: string; onClick: () => void }) {
-  const { label, icon: Icon } = ACTIONS[action];
+function ActionButton({ nearby, onClick }: { nearby: Nearby; onClick: () => void }) {
+  const { label, icon: Icon } = describeAction(nearby);
   return (
     <button
       type="button"

@@ -15,6 +15,8 @@ export interface SitSpot {
   z: number;
   y: number;
   yaw: number;
+  /** "lie" flat in a nap pod, or "hidden" inside a toilet stall. Sitting otherwise. */
+  pose?: "lie" | "hidden";
 }
 
 function furnitureUnder(map: WorldMap, kind: Furniture["kind"], x: number, z: number, slack: number) {
@@ -49,6 +51,36 @@ export function sitSpot(map: WorldMap, seat: Seat): SitSpot {
   if (seat.kind === "beanbag") {
     const bag = furnitureUnder(map, "beanbag", point.x, point.y, 0.3);
     if (bag) return { x: bag.rect.x + 0.5, z: bag.rect.y + 0.55, y: 0.16, yaw: 0 };
+  }
+  if (seat.kind === "stall") {
+    return { x: point.x, z: point.y, y: 0.2, yaw: 0, pose: "hidden" };
+  }
+  if (seat.kind === "bed") {
+    // On your back on the mattress, head under the pod's hood.
+    const pod = furnitureUnder(map, "napPod", point.x, point.y, 0.2);
+    const z = pod ? pod.rect.y + pod.rect.h - 0.55 : point.y;
+    return { x: point.x, z, y: 0.69, yaw: 0, pose: "lie" };
+  }
+  if (seat.kind === "cushion") {
+    // Cushions face the breathing mat.
+    const mat = map.furniture.find((item) => item.kind === "breathMat");
+    const mx = mat ? mat.rect.x + mat.rect.w / 2 : point.x;
+    const mz = mat ? mat.rect.y + mat.rect.h / 2 : point.y + 1;
+    return { x: point.x, z: point.y, y: 0.12, yaw: Math.atan2(mx - point.x, mz - point.y) };
+  }
+  if (seat.kind === "armchair") {
+    return { x: point.x, z: point.y, y: 0.3, yaw: seat.facing === "up" ? Math.PI : 0 };
+  }
+  if (seat.kind === "bench") {
+    // Picnic and park benches: sit where the map says, facing the table or the path.
+    return { x: point.x, z: point.y, y: 0.24, yaw: seat.facing === "up" ? Math.PI : 0 };
+  }
+  if (seat.kind === "log") {
+    // Logs face the fire.
+    const fire = map.furniture.find((item) => item.kind === "firePit");
+    const fx = fire ? fire.rect.x + fire.rect.w / 2 : point.x;
+    const fz = fire ? fire.rect.y + fire.rect.h / 2 : point.y + 1;
+    return { x: point.x, z: point.y, y: 0.27, yaw: Math.atan2(fx - point.x, fz - point.y) };
   }
   if (seat.kind === "stool") {
     // Stools face the round table when they're at it, otherwise the counter to the north.

@@ -1,7 +1,7 @@
 import { Group, PlaneGeometry } from "three";
 import type { WorldMap, ZoneKind } from "@/lib/world/map";
 import { COLORS, TEXTURE_TILES, floorPaint } from "./materials";
-import { box, mesh } from "./parts";
+import { ball, box, mesh, rbox, seeded } from "./parts";
 
 /** Walls at the back of a room stand tall; walls between the camera and a room are cut down. */
 export const WALL_HEIGHT = 1.3;
@@ -24,22 +24,38 @@ const FLOORS: Record<ZoneKind, () => ReturnType<typeof floorPaint>> = {
   meeting: () => floorPaint("carpet", "#e6ddf7", "#d6c9f0"),
   kitchen: () => floorPaint("tiles", "#dff1e7", "#c4e2d2"),
   lounge: () => floorPaint("planks", "#f7e2d1", "#ead0ba"),
+  game: () => floorPaint("carpet", "#e3d7fb", "#d3c3f4"),
+  wash: () => floorPaint("tiles", "#eef6fb", "#d5e6f0"),
+  nap: () => floorPaint("carpet", "#d6cfe8", "#c7bedf"),
+  garden: () => floorPaint("carpet", "#c6e8aa", "#b2dc93"),
+  personal: () => floorPaint("carpet", "#ece1f6", "#ddd0ee"),
 };
+
+const LAWN = () => floorPaint("carpet", "#b3da95", "#a2cf83");
+const HEDGE = "#5fae6e";
+const HEDGE_LIGHT = "#79c487";
 
 function isFloor(map: WorldMap, c: number, r: number): boolean {
   return map.layout[r]?.[c] === ".";
 }
 
+function isWall(map: WorldMap, c: number, r: number): boolean {
+  return map.layout[r]?.[c] === "#";
+}
+
 /**
- * True when a wall tile would hide a room behind it (seen from the camera,
- * which looks north): following the wall north, you reach floor before the
- * edge of the building. Only the building's back walls stand tall.
+ * True when a wall tile is drawn cut down low so the camera (which looks
+ * north) can see past it:
+ * - it has floor directly north of it, so it would hide that room; or
+ * - it's part of a free-standing stretch of wall between two rooms (floor on
+ *   both sides) whose north end opens onto floor, like the short divider
+ *   below the gap between the desks and the lounge.
  */
 export function isCutWall(map: WorldMap, c: number, r: number): boolean {
-  for (let row = r - 1; row >= 0; row -= 1) {
-    if (isFloor(map, c, row)) return true;
-  }
-  return false;
+  if (isFloor(map, c, r - 1)) return true;
+  let row = r;
+  while (isWall(map, c, row) && isFloor(map, c - 1, row) && isFloor(map, c + 1, row)) row -= 1;
+  return row < r && isFloor(map, c, row);
 }
 
 /** Floors, walls and the base the whole office stands on. */
@@ -73,9 +89,25 @@ export function buildRoom(map: WorldMap): Group {
     room.add(floor);
   }
 
-  // Walls, one tile at a time (they are merged into one mesh later).
+  // Walls, lawn and hedges, one tile at a time (they are merged into a few meshes later).
   map.layout.forEach((row, r) => {
     for (let c = 0; c < row.length; c += 1) {
+      if (row[c] === "g") {
+        const plane = new PlaneGeometry(1, 1);
+        plane.rotateX(-Math.PI / 2);
+        const lawn = mesh(plane, LAWN(), c + 0.5, FLOOR_TOP, r + 0.5);
+        lawn.userData.flat = true;
+        room.add(lawn);
+        continue;
+      }
+      if (row[c] === "h") {
+        const random = seeded(`hedge-${c}-${r}`);
+        room.add(rbox(0.9, 0.62, 1.02, HEDGE, c + 0.5, 0.31, r + 0.5, 0.18));
+        for (let i = 0; i < 3; i += 1) {
+          room.add(ball(0.2, i % 2 ? HEDGE : HEDGE_LIGHT, c + 0.25 + random() * 0.5, 0.62, r + 0.2 + i * 0.3, [1, 0.7, 1]));
+        }
+        continue;
+      }
       if (row[c] !== "#") continue;
       const height = isCutWall(map, c, r) ? CUT_WALL_HEIGHT : WALL_HEIGHT;
       room.add(box(1, height, 1, COLORS.wallSide, c + 0.5, height / 2, r + 0.5));

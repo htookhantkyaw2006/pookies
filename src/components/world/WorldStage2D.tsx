@@ -174,7 +174,7 @@ export function WorldStage2D({
   }, []);
 
   return (
-    <div ref={containerRef} className="absolute inset-0 bg-[#5b4a63]">
+    <div ref={containerRef} className="absolute inset-0 isolate bg-[#5b4a63]">
       <div
         ref={worldRef}
         className="absolute top-0 left-0 origin-top-left will-change-transform"

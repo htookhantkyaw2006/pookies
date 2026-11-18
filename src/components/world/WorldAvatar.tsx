@@ -36,6 +36,7 @@ export function WorldAvatar({
         data-near="false"
         data-emote="false"
         data-sitting="false"
+        data-resting="false"
         className="group/avatar pointer-events-none absolute top-0 left-0 opacity-0 transition-opacity duration-300 will-change-transform"
       >
         <div className="absolute bottom-0 left-0 flex -translate-x-1/2 flex-col items-center gap-1">
@@ -60,6 +61,9 @@ export function WorldAvatar({
           >
             <Icon aria-hidden="true" className="size-3" strokeWidth={2.75} />
             {isYou ? "You" : firstName}
+            <span aria-hidden="true" className="hidden group-data-[resting=true]/avatar:inline">
+              💤
+            </span>
             <span className="sr-only">, {meta.label}</span>
           </p>
           {/* The 3D character holds its own coffee; this keeps the slot the map view fills. */}
@@ -77,6 +81,7 @@ export function WorldAvatar({
       data-near="false"
       data-emote="false"
       data-sitting="false"
+      data-resting="false"
       className="group/avatar absolute top-0 left-0 opacity-0 transition-opacity duration-300 will-change-transform"
     >
       {/* Shadow on the floor */}
@@ -122,6 +127,9 @@ export function WorldAvatar({
       >
         <Icon aria-hidden="true" className="size-3" strokeWidth={2.75} />
         {isYou ? "You" : firstName}
+        <span aria-hidden="true" className="hidden group-data-[resting=true]/avatar:inline">
+          💤
+        </span>
         <span className="sr-only">, {meta.label}</span>
       </p>
     </div>

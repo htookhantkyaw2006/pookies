@@ -96,11 +96,54 @@ export interface BoardNote {
   updatedAt: number;
 }
 
+/** The games in the game corner. */
+export const GAMES = ["snack", "darts"] as const;
+export type GameId = (typeof GAMES)[number];
+
+/** Someone's best score in one game. */
+export interface GameScore {
+  game: GameId;
+  userId: string;
+  score: number;
+  at: number;
+}
+
+/** Backdrops for the photo booth. */
+export const PHOTO_BACKDROPS = ["garden", "stars", "confetti", "sunset"] as const;
+export type PhotoBackdrop = (typeof PHOTO_BACKDROPS)[number];
+
+/** How each pookie poses for the camera (picked for them). */
+export const PHOTO_POSES = ["wave", "peace", "jump", "heart"] as const;
+export type PhotoPose = (typeof PHOTO_POSES)[number];
+
+/** Someone in a photo, as they looked when it was taken. */
+export interface PhotoPerson {
+  id: string;
+  name: string;
+  avatar: AvatarStyle;
+  pose: PhotoPose;
+}
+
+/** A team photo from the booth, pinned on the photo wall. */
+export interface Photo {
+  id: string;
+  takenAt: number;
+  /** Who pressed the button; null once they've left. */
+  takenBy: string | null;
+  backdrop: PhotoBackdrop;
+  /** One to four people, left to right. */
+  people: PhotoPerson[];
+}
+
 /** Shared things in the office itself, saved for everyone. */
 export interface OfficeThings {
   board: BoardNote | null;
   /** Plant id (from the office map) to when it was last watered. */
   plants: Record<string, number>;
+  /** Everyone's best score in each game (one per person per game). */
+  scores: GameScore[];
+  /** The photo wall, newest first. */
+  photos: Photo[];
 }
 
 export interface OfficeState {
@@ -137,6 +180,12 @@ export interface OfficeActions {
   /** Anyone in the workspace can write on the whiteboard. Empty text wipes it. */
   writeBoard(text: string): Promise<ActionResult>;
   waterPlant(plantId: string): Promise<ActionResult>;
+  /** Saves a finished round. Only beats your best if it's higher. */
+  submitScore(game: GameId, score: number): Promise<ActionResult>;
+  /** Pins a booth photo of these people (you must be one of them) to the wall. */
+  pinPhoto(backdrop: PhotoBackdrop, peopleIds: string[]): Promise<ActionResult>;
+  /** Takes a photo off the wall: anyone in it, whoever took it, or an admin. */
+  removePhoto(photoId: string): Promise<ActionResult>;
 }
 
 /** Where this browser stands with the office. */
@@ -169,6 +218,8 @@ export type WorldMessage =
   | { type: "wave"; id: string }
   /** A quick emoji over someone's head, or (hold) something they carry for a while. */
   | { type: "emote"; id: string; emoji: string; hold: boolean }
+  /** Someone started the photo booth countdown. */
+  | { type: "snap"; id: string; backdrop: PhotoBackdrop }
   /** Someone just connected: a good moment to tell them where you are. */
   | { type: "peer-joined"; id: string };
 
@@ -182,6 +233,8 @@ export interface WorldTransport {
   sendPosition(x: number, y: number, seat: string | null): boolean;
   sendWave(): void;
   sendEmote(emoji: string, hold: boolean): void;
+  /** Tells everyone the photo booth countdown just started. */
+  sendSnap(backdrop: PhotoBackdrop): void;
   subscribe(listener: (message: WorldMessage) => void): () => void;
 }
 

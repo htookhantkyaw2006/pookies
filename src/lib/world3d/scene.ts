@@ -20,9 +20,31 @@ import {
   buildWaterCooler,
 } from "./furniture/desks";
 import { buildWallDecor, buildWhiteboard } from "./furniture/decor";
+import {
+  buildBench,
+  buildFirePit,
+  buildFlowerBed,
+  buildLog,
+  buildPath,
+  buildPicnicTable,
+  buildPond,
+  buildStringLights,
+  buildTree,
+} from "./furniture/garden";
 import { buildCounter, buildFridge, buildRoundTable } from "./furniture/kitchen";
 import { buildCoffeeTable, buildFloorLamp, buildGameTable, buildPlant, buildRug } from "./furniture/lounge";
+import { buildArcade, buildFoosball, buildThrowLine } from "./furniture/games";
+import { buildPhotoBooth, buildPhotoCamera, buildPhotoWall } from "./furniture/photo";
+import { buildArmchair, buildDoorSign, buildRoomRug, buildSideTable } from "./furniture/rooms";
 import { buildBeanbag, buildSeat, buildSofa } from "./furniture/seating";
+import {
+  buildBreathMat,
+  buildFloorCushion,
+  buildNapPod,
+  buildShower,
+  buildSinkCounter,
+  buildStall,
+} from "./furniture/washroom";
 import { paint } from "./materials";
 import { mesh } from "./parts";
 import { MARKER_HEIGHT, buildRoom } from "./room";
@@ -64,6 +86,56 @@ export function buildFurniture(item: Furniture, mood: PlantMood = "fine"): Group
       return buildFloorLamp(item);
     case "plant":
       return buildPlant(item, mood);
+    case "path":
+      return buildPath(item);
+    case "tree":
+      return buildTree(item);
+    case "picnicTable":
+      return buildPicnicTable(item);
+    case "bench":
+      return buildBench(item);
+    case "log":
+      return buildLog(item);
+    case "firePit":
+      return buildFirePit(item);
+    case "pond":
+      return buildPond(item);
+    case "flowerBed":
+      return buildFlowerBed(item);
+    case "stringLights":
+      return buildStringLights(item);
+    case "stall":
+      return buildStall(item);
+    case "sinkCounter":
+      return buildSinkCounter(item);
+    case "shower":
+      return buildShower(item);
+    case "napPod":
+      return buildNapPod(item);
+    case "breathMat":
+      return buildBreathMat(item);
+    case "floorCushion":
+      return buildFloorCushion(item);
+    case "roomRug":
+      return buildRoomRug(item);
+    case "armchair":
+      return buildArmchair(item);
+    case "sideTable":
+      return buildSideTable(item);
+    case "doorSign":
+      return buildDoorSign(item);
+    case "arcade":
+      return buildArcade(item);
+    case "foosball":
+      return buildFoosball(item);
+    case "throwLine":
+      return buildThrowLine(item);
+    case "photoBooth":
+      return buildPhotoBooth(item);
+    case "photoCamera":
+      return buildPhotoCamera(item);
+    case "photoWall":
+      return buildPhotoWall(item);
     case "whiteboard": {
       const { board, surface } = buildWhiteboard(item);
       board.add(surface);

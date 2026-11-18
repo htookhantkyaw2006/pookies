@@ -96,6 +96,8 @@ export interface PookiePose {
   seatYaw: number | null;
   holdingCoffee: boolean;
   visible: boolean;
+  /** Lying flat on your back (in a nap pod). */
+  lying?: boolean;
 }
 
 /** One person in the 3D office. */
@@ -160,6 +162,13 @@ export class Pookie {
     return this.body.position.y;
   }
 
+  /** Where the top of the head is, for placing the name tag. Lower when lying down. */
+  get labelHeight(): number {
+    return this.lying ? this.body.position.y + 0.25 : HEAD_HEIGHT + this.body.position.y;
+  }
+
+  private lying = false;
+
   setStatus(status: DisplayStatus): void {
     if (status === this.status) return;
     this.status = status;
@@ -181,6 +190,9 @@ export class Pookie {
     this.body.position.y = pose.y;
     this.mug.visible = pose.holdingCoffee;
     this.feet.visible = !pose.sitting;
+    // Lying on your back, head to the north, face to the sky (and the camera).
+    this.lying = Boolean(pose.lying);
+    this.body.rotation.x = this.lying ? -Math.PI / 2 : 0;
 
     // Face the way you walk; face the desk when sitting; turn back to the camera when idle.
     let want = this.yaw;

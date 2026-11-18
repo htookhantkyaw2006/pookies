@@ -11,20 +11,32 @@ import {
   cleanLine,
   validateCheckIn,
   validateName,
+  validatePhoto,
+  validateScore,
+  PHOTO_WALL_SIZE,
 } from "../rules";
 import {
   AVATAR_COLORS,
   AVATAR_SHAPES,
+  GAMES,
+  PHOTO_BACKDROPS,
+  PHOTO_POSES,
   type ActionResult,
   type AvatarColor,
   type AvatarShape,
   type CheckIn,
+  type GameId,
+  type GameScore,
   type Invite,
   type Member,
   type OfficeActions,
   type OfficeConnection,
   type OfficeStore,
   type OfficeThings,
+  type Photo,
+  type PhotoBackdrop,
+  type PhotoPerson,
+  type PhotoPose,
   type PresenceEntry,
   type PresenceStatus,
   type WorldMessage,
@@ -51,7 +63,16 @@ const fail = (error: string): ActionResult => ({ ok: false, error });
 const UNREACHABLE = "We couldn't reach the office. Check your connection and try again.";
 const STATUSES: readonly PresenceStatus[] = ["online", "busy", "away"];
 
-type Table = "workspaces" | "workspace_members" | "profiles" | "check_ins" | "invites";
+type Table =
+  | "workspaces"
+  | "workspace_members"
+  | "profiles"
+  | "check_ins"
+  | "invites"
+  | "game_scores"
+  | "photos";
+/** Everything there is to read, for a first load or catching up after a dropped connection. */
+const ALL_TABLES = ["workspaces", "workspace_members", "check_ins", "invites", "game_scores", "photos"] as const;
 
 let snapshot: OfficeConnection = LOADING;
 const listeners = new Set<() => void>();
@@ -64,7 +85,7 @@ let members: Member[] = [];
 let checkIns: CheckIn[] = [];
 let invites: Invite[] = [];
 let presence: PresenceEntry[] = [];
-const NO_THINGS: OfficeThings = { board: null, plants: {} };
+const NO_THINGS: OfficeThings = { board: null, plants: {}, scores: [], photos: [] };
 let things: OfficeThings = NO_THINGS;
 
 let channel: RealtimeChannel | null = null;
@@ -122,7 +143,8 @@ function toShape(value: string): AvatarShape {
 
 interface WorkspaceAndThings {
   workspace: Workspace;
-  things: OfficeThings;
+  /** Scores and photos live in their own tables and are read separately. */
+  things: Omit<OfficeThings, "scores" | "photos">;
 }
 
 function toPlants(value: Json): Record<string, number> {
@@ -205,6 +227,60 @@ async function fetchCheckIns(workspaceId: string): Promise<CheckIn[]> {
   }));
 }
 
+async function fetchScores(workspaceId: string): Promise<GameScore[]> {
+  const { data, error } = await getSupabase()
+    .from("game_scores")
+    .select("game, user_id, score, scored_at")
+    .eq("workspace_id", workspaceId);
+  if (error) throw error;
+  return data
+    .filter((row) => (GAMES as readonly string[]).includes(row.game))
+    .map((row) => ({
+      game: row.game as GameId,
+      userId: row.user_id,
+      score: row.score,
+      at: Date.parse(row.scored_at),
+    }));
+}
+
+/** One person in a saved photo, if the row looks right. */
+function toPhotoPerson(value: Json): PhotoPerson | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const { id, name, color, shape, pose } = value;
+  if (typeof id !== "string" || typeof name !== "string") return null;
+  return {
+    id,
+    name,
+    avatar: { color: toColor(String(color)), shape: toShape(String(shape)) },
+    pose: (PHOTO_POSES as readonly string[]).includes(String(pose)) ? (pose as PhotoPose) : "wave",
+  };
+}
+
+async function fetchPhotos(workspaceId: string): Promise<Photo[]> {
+  const { data, error } = await getSupabase()
+    .from("photos")
+    .select("id, taken_by, taken_at, backdrop, people")
+    .eq("workspace_id", workspaceId)
+    .order("taken_at", { ascending: false })
+    .limit(PHOTO_WALL_SIZE);
+  if (error) throw error;
+  return data.flatMap((row) => {
+    const people = Array.isArray(row.people)
+      ? row.people.map(toPhotoPerson).filter((person): person is PhotoPerson => person !== null)
+      : [];
+    if (people.length === 0 || !(PHOTO_BACKDROPS as readonly string[]).includes(row.backdrop)) return [];
+    return [
+      {
+        id: row.id,
+        takenAt: Date.parse(row.taken_at),
+        takenBy: row.taken_by,
+        backdrop: row.backdrop as PhotoBackdrop,
+        people,
+      },
+    ];
+  });
+}
+
 /** Only admins get rows back; for everyone else this is simply empty. */
 async function fetchInvites(workspaceId: string): Promise<Invite[]> {
   const { data, error } = await getSupabase()
@@ -232,16 +308,24 @@ async function refresh(tables: Iterable<Table>): Promise<boolean> {
   // A role change can change who may see invite links.
   if (wanted.has("workspace_members")) wanted.add("invites");
 
-  const [nextWorkspace, nextMembers, nextCheckIns, nextInvites] = await Promise.all([
+  // Someone leaving takes their scores with them, and steps out of the photos.
+  if (wanted.has("workspace_members")) {
+    wanted.add("game_scores");
+    wanted.add("photos");
+  }
+
+  const [nextWorkspace, nextMembers, nextCheckIns, nextInvites, nextScores, nextPhotos] = await Promise.all([
     wanted.has("workspaces") ? fetchWorkspace(id) : { workspace, things },
     wanted.has("workspace_members") || wanted.has("profiles") ? fetchMembers(id) : members,
     wanted.has("check_ins") ? fetchCheckIns(id) : checkIns,
     wanted.has("invites") ? fetchInvites(id) : invites,
+    wanted.has("game_scores") ? fetchScores(id) : things.scores,
+    wanted.has("photos") ? fetchPhotos(id) : things.photos,
   ]);
 
   if (!nextWorkspace || !nextMembers.some((member) => member.id === userId)) return false;
   workspace = nextWorkspace.workspace;
-  things = nextWorkspace.things;
+  things = { ...nextWorkspace.things, scores: nextScores, photos: nextPhotos };
   members = nextMembers;
   checkIns = nextCheckIns;
   invites = nextInvites;
@@ -249,7 +333,7 @@ async function refresh(tables: Iterable<Table>): Promise<boolean> {
 }
 
 function scheduleRefetch(table: unknown): void {
-  const known: readonly string[] = ["workspaces", "workspace_members", "profiles", "check_ins", "invites"];
+  const known: readonly string[] = [...ALL_TABLES, "profiles"];
   if (typeof table !== "string" || !known.includes(table)) return;
   pendingTables.add(table as Table);
   if (refetchTimer) return;
@@ -367,6 +451,19 @@ async function openChannel(workspaceId: string, me: string): Promise<void> {
         emitWorld({ type: "emote", id: data.id, emoji: data.emoji, hold: data.hold === true });
       }
     })
+    .on("broadcast", { event: "snap" }, ({ payload }) => {
+      const data = payload as { id?: unknown; backdrop?: unknown } | null;
+      if (
+        channel === next &&
+        data &&
+        typeof data.id === "string" &&
+        data.id !== me &&
+        typeof data.backdrop === "string" &&
+        (PHOTO_BACKDROPS as readonly string[]).includes(data.backdrop)
+      ) {
+        emitWorld({ type: "snap", id: data.id, backdrop: data.backdrop as PhotoBackdrop });
+      }
+    })
     .on("broadcast", { event: "wave" }, ({ payload }) => {
       const id = (payload as { id?: unknown } | null)?.id;
       if (channel === next && typeof id === "string" && id !== me) emitWorld({ type: "wave", id });
@@ -379,9 +476,7 @@ async function openChannel(workspaceId: string, me: string): Promise<void> {
         void trackMe();
         // After a dropped connection, catch up on anything we missed.
         if (reconnected) {
-          for (const table of ["workspaces", "workspace_members", "check_ins", "invites"] as const) {
-            scheduleRefetch(table);
-          }
+          for (const table of ALL_TABLES) scheduleRefetch(table);
         }
       } else {
         channelReady = false;
@@ -430,7 +525,7 @@ async function connect(me: string): Promise<void> {
     }
 
     workspace = { id: membership.workspace_id, name: "" };
-    const stillHere = await refresh(["workspaces", "workspace_members", "check_ins", "invites"]);
+    const stillHere = await refresh(ALL_TABLES);
     if (current !== attempt) return;
     if (!stillHere) {
       workspace = null;
@@ -605,6 +700,27 @@ const actions: OfficeActions = {
     publish();
     return act(() => getSupabase().rpc("water_plant", { p_plant: plantId }), ["workspaces"]);
   },
+
+  async submitScore(game, score) {
+    const valid = validateScore(game, score);
+    if (!valid.ok) return valid;
+    const mine = things.scores.find((item) => item.game === game && item.userId === userId);
+    // Nothing to save if it doesn't beat your best.
+    if (mine && mine.score >= score) return OK;
+    return act(() => getSupabase().rpc("submit_score", { p_game: game, p_score: score }), ["game_scores"]);
+  },
+
+  async pinPhoto(backdrop, peopleIds) {
+    const valid = validatePhoto(backdrop, peopleIds, userId ?? "", members);
+    if (!valid.ok) return valid;
+    return act(
+      () => getSupabase().rpc("pin_photo", { p_backdrop: backdrop, p_people: peopleIds }),
+      ["photos"],
+    );
+  },
+
+  removePhoto: (photoId) =>
+    act(() => getSupabase().rpc("remove_photo", { p_photo: photoId }), ["photos"]),
 };
 
 export const supabaseStore: OfficeStore = {
@@ -689,6 +805,10 @@ export const supabaseStore: OfficeStore = {
     sendWave() {
       if (!channel || !channelReady || !userId) return;
       void channel.send({ type: "broadcast", event: "wave", payload: { id: userId } });
+    },
+    sendSnap(backdrop) {
+      if (!channel || !channelReady || !userId) return;
+      void channel.send({ type: "broadcast", event: "snap", payload: { id: userId, backdrop } });
     },
     subscribe(listener) {
       worldListeners.add(listener);

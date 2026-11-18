@@ -17,6 +17,7 @@ import {
   type Point,
   type Seat,
   type Thing,
+  type TileRect,
   type WorldMap,
   type Zone,
   type ZoneKind,
@@ -31,6 +32,8 @@ import { findPath, nearestWalkable } from "./pathfinding";
  */
 
 export const PLAYER_SPEED = 230;
+/** Going somewhere picked from Places: a brisk walk, because the office is big. */
+export const HURRY_SPEED = PLAYER_SPEED * 1.9;
 /** Sample teammates stroll. */
 export const TEAMMATE_SPEED = 130;
 /** Real teammates move a touch faster than they walk, to catch up with the network. */
@@ -100,7 +103,7 @@ export type TeammateMode = "simulated" | "live";
 const ZONES_FOR_STATUS: Record<Exclude<DisplayStatus, "offline">, ZoneKind[]> = {
   online: ["desks"],
   busy: ["focus", "meeting"],
-  away: ["kitchen", "lounge"],
+  away: ["kitchen", "lounge", "garden", "nap"],
 };
 
 export class WorldEngine {
@@ -124,6 +127,8 @@ export class WorldEngine {
   private readonly seats: Map<string, Seat>;
   /** You clicked a seat: sit in it once you get there. */
   private sitOnArrival: string | null = null;
+  /** Walking briskly to a place picked from Places. */
+  private hurrying = false;
 
   constructor(map: WorldMap, random: () => number) {
     this.map = map;
@@ -212,7 +217,15 @@ export class WorldEngine {
       this.player.path = [];
       this.playerTarget = null;
       this.sitOnArrival = null;
+      this.hurrying = false;
     }
+  }
+
+  /** Walks briskly to a room picked from Places. */
+  hurryTo(x: number, y: number): boolean {
+    const reached = this.walkTo(x, y);
+    this.hurrying = reached;
+    return reached;
   }
 
   /**
@@ -222,6 +235,7 @@ export class WorldEngine {
   walkTo(x: number, y: number): boolean {
     const player = this.player;
     if (!player) return false;
+    this.hurrying = false;
     const seat = this.seatUnderPoint(x, y);
     if (seat && this.isFree(seat, player)) {
       if (player.sitting && player.seatId === seat.id) return true;
@@ -350,6 +364,27 @@ export class WorldEngine {
     if (!entity?.visible || id === this.playerId) return;
     if (hold) this.hold(entity, emoji, COFFEE_SECONDS);
     else this.showEmote(entity, emoji);
+  }
+
+  /** Who's standing in an area right now (tile units): you first, then left to right. */
+  peopleIn(rect: TileRect): string[] {
+    const inside = [...this.entities.values()].filter((entity) => {
+      if (!entity.visible || entity.leaving) return false;
+      const x = entity.x / TILE;
+      const y = entity.y / TILE;
+      return x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h;
+    });
+    inside.sort((a, b) => Number(b.id === this.playerId) - Number(a.id === this.playerId) || a.x - b.x);
+    return inside.map((entity) => entity.id);
+  }
+
+  /** Everyone listed strikes a pose for the camera (just on this screen). */
+  pose(ids: readonly string[]): void {
+    const poses = ["✌️", "💖", "✨", "🙌"];
+    ids.forEach((id, index) => {
+      const entity = this.entities.get(id);
+      if (entity?.visible) this.showEmote(entity, poses[index % poses.length]);
+    });
   }
 
   /** A quick emoji over your head. */
@@ -519,7 +554,8 @@ export class WorldEngine {
       player.y = moved.y;
       return;
     }
-    this.followPath(player, PLAYER_SPEED, dt);
+    this.followPath(player, this.hurrying ? HURRY_SPEED : PLAYER_SPEED, dt);
+    if (player.path.length === 0) this.hurrying = false;
     if (player.path.length === 0) {
       this.playerTarget = null;
       if (this.sitOnArrival) {

@@ -28,6 +28,11 @@ const FLOOR: Record<ZoneKind, string> = {
   meeting: "#e9e1f8",
   kitchen: "url(#floor-tiles)",
   lounge: "#fbe6d6",
+  game: "#e8defb",
+  wash: "url(#floor-wash)",
+  nap: "#d9d3ea",
+  garden: "url(#floor-grass)",
+  personal: "#efe4f7",
 };
 
 const LABELS: Record<ZoneKind, { x: number; y: number; anchor: "start" | "end" }> = {
@@ -36,6 +41,11 @@ const LABELS: Record<ZoneKind, { x: number; y: number; anchor: "start" | "end" }
   meeting: { x: 11.35, y: 6.7, anchor: "start" },
   kitchen: { x: 30.7, y: 6.7, anchor: "end" },
   lounge: { x: 22.3, y: 15.8, anchor: "start" },
+  game: { x: 32.4, y: 6.7, anchor: "start" },
+  wash: { x: 30.6, y: 25.7, anchor: "end" },
+  nap: { x: 1.4, y: 25.7, anchor: "start" },
+  garden: { x: 38.2, y: 14.7, anchor: "start" },
+  personal: { x: 9.4, y: 25.7, anchor: "start" },
 };
 
 const LEAVES: Record<PlantMood, [string, string, string]> = {
@@ -290,6 +300,244 @@ function drawFurniture(item: Furniture, moods: Record<string, PlantMood>): React
           <circle cx={x + T / 2} cy={y + T / 2} r={10} fill="#fff4d6" stroke="#e8c97a" strokeWidth={2} />
         </g>
       );
+    case "path": {
+      const stones: ReactNode[] = [];
+      const along = w >= h;
+      const length = along ? w : h;
+      for (let step = 18; step < length - 8; step += 30) {
+        for (const lane of [-18, 18]) {
+          const sx = along ? x + step : x + w / 2 + lane;
+          const sy = along ? y + h / 2 + lane : y + step;
+          stones.push(<rect key={`${step}-${lane}`} x={sx - 12} y={sy - 10} width={24} height={20} rx={8} />);
+        }
+      }
+      return (
+        <g key={item.id} fill="#ebe2d4" stroke="#d9cdbb" strokeWidth={1.5}>
+          {stones}
+        </g>
+      );
+    }
+    case "tree":
+      return (
+        <g key={item.id}>
+          <circle cx={x + T / 2} cy={y + T / 2 + 4} r={20} fill="#2b2233" opacity={0.08} />
+          <circle cx={x + T / 2} cy={y + T / 2} r={20} fill="#5fb07a" />
+          <circle cx={x + T / 2 - 7} cy={y + T / 2 - 6} r={10} fill="#79c48f" />
+        </g>
+      );
+    case "picnicTable":
+      return (
+        <g key={item.id}>
+          <rect x={x + 8} y={y + 6} width={w - 16} height={14} rx={4} fill="#c99a6c" />
+          <rect x={x + 8} y={y + h - 20} width={w - 16} height={14} rx={4} fill="#c99a6c" />
+          <rect x={x + 10} y={y + 26} width={w - 20} height={h - 52} rx={6} fill="#dcb38a" stroke="#a97c55" strokeWidth={2} />
+          <rect x={x + w / 2 - 22} y={y + 32} width={44} height={h - 64} fill="#f6b3c5" />
+        </g>
+      );
+    case "bench":
+      return (
+        <g key={item.id}>
+          <rect x={x + 6} y={y + 10} width={w - 12} height={8} rx={4} fill="#a97c55" />
+          <rect x={x + 6} y={y + 20} width={w - 12} height={18} rx={5} fill="#c99a6c" />
+        </g>
+      );
+    case "log":
+      return (
+        <g key={item.id}>
+          <rect x={x + 7} y={y + 16} width={w - 14} height={16} rx={8} fill="#9a6b4a" />
+          <ellipse cx={x + 9} cy={y + 24} rx={5} ry={7} fill="#e2c39d" />
+        </g>
+      );
+    case "firePit":
+      return (
+        <g key={item.id}>
+          <circle cx={x + w / 2} cy={y + h / 2} r={34} fill="#b8aea4" />
+          <circle cx={x + w / 2} cy={y + h / 2} r={26} fill="#6b5a50" />
+          <circle cx={x + w / 2} cy={y + h / 2} r={14} fill="#ff7a45" />
+          <circle cx={x + w / 2} cy={y + h / 2} r={8} fill="#ffd166" />
+        </g>
+      );
+    case "pond":
+      return (
+        <g key={item.id}>
+          <ellipse cx={x + w / 2} cy={y + h / 2} rx={w / 2 - 6} ry={h / 2 - 6} fill="#8fd0f0" stroke="#cfc6bb" strokeWidth={6} />
+          <circle cx={x + w / 2 - 28} cy={y + h / 2 - 6} r={8} fill="#6cc48a" />
+          <circle cx={x + w / 2 + 22} cy={y + h / 2 + 12} r={7} fill="#6cc48a" />
+          <ellipse cx={x + w / 2 + 6} cy={y + h / 2 - 10} rx={6} ry={3} fill="#ff9a4a" />
+        </g>
+      );
+    case "flowerBed":
+      return (
+        <g key={item.id}>
+          <rect x={x + 4} y={y + 4} width={w - 8} height={h - 8} rx={8} fill="#8a6248" stroke="#a97c55" strokeWidth={3} />
+          {Array.from({ length: Math.round((w * h) / 260) }, (_, i) => (
+            <circle
+              key={i}
+              cx={x + 12 + ((i * 37) % (w - 24))}
+              cy={y + 12 + ((i * 23) % (h - 24))}
+              r={5}
+              fill={["#ff8fa3", "#ffe08a", "#cfbcf8", "#ffc4a3", "#ffffff"][i % 5]}
+            />
+          ))}
+        </g>
+      );
+    case "stall":
+      return (
+        <g key={item.id}>
+          <rect x={x + 3} y={y + 3} width={w - 6} height={h - 6} rx={4} fill="#eef6fb" stroke="#a9c7d8" strokeWidth={3} />
+          <rect x={x + w / 2 - 14} y={y + 10} width={28} height={16} rx={6} fill="#ffffff" stroke="#cfdbe3" strokeWidth={2} />
+          <ellipse cx={x + w / 2} cy={y + 42} rx={16} ry={14} fill="#ffffff" stroke="#cfdbe3" strokeWidth={2} />
+          <rect x={x + 8} y={y + h - 9} width={w - 16} height={6} rx={3} fill="#a9c7d8" />
+        </g>
+      );
+    case "sinkCounter":
+      return (
+        <g key={item.id}>
+          <rect x={x + 4} y={y + 4} width={w - 8} height={h - 8} rx={6} fill="#ffffff" stroke="#cfdbe3" strokeWidth={2} />
+          <ellipse cx={x + w / 2} cy={y + h / 2 - 30} rx={13} ry={10} fill="#e3eef5" stroke="#b9c4cc" strokeWidth={2} />
+          <ellipse cx={x + w / 2} cy={y + h / 2 + 30} rx={13} ry={10} fill="#e3eef5" stroke="#b9c4cc" strokeWidth={2} />
+        </g>
+      );
+    case "shower":
+      return (
+        <g key={item.id}>
+          <rect x={x + 5} y={y + 5} width={w - 10} height={h - 10} rx={8} fill="#e6f5fc" stroke="#9fd2ea" strokeWidth={3} />
+          <circle cx={x + w - 20} cy={y + 20} r={9} fill="#b9c4cc" />
+          <circle cx={x + 30} cy={y + h - 26} r={6} fill="#ffe08a" />
+        </g>
+      );
+    case "napPod":
+      return (
+        <g key={item.id}>
+          <rect x={x + 4} y={y + 4} width={w - 8} height={h - 8} rx={18} fill="#b9a8e6" />
+          <rect x={x + 9} y={y + 30} width={w - 18} height={h - 40} rx={10} fill="#8fa5e8" />
+          <rect x={x + 12} y={y + 12} width={w - 24} height={14} rx={6} fill="#ffffff" />
+        </g>
+      );
+    case "breathMat":
+      return (
+        <g key={item.id}>
+          <circle cx={x + w / 2} cy={y + h / 2} r={w / 2 - 6} fill="#c9bff2" />
+          <circle cx={x + w / 2} cy={y + h / 2} r={w / 2 - 22} fill="#e6dffb" />
+          <circle cx={x + w / 2} cy={y + h / 2} r={10} fill="#cfbcf8" />
+        </g>
+      );
+    case "floorCushion":
+      return (
+        <g key={item.id}>
+          <rect x={x + 9} y={y + 9} width={w - 18} height={h - 18} rx={10} fill={item.id.endsWith("1") ? "#ffb5c9" : "#a9e5c8"} />
+          <circle cx={x + w / 2} cy={y + h / 2} r={3} fill="#ffffff" />
+        </g>
+      );
+    case "roomRug":
+      return (
+        <g key={item.id}>
+          <rect x={x + 18} y={y + 18} width={w - 36} height={h - 36} rx={30} fill="#f3c6d6" opacity={0.8} />
+          <rect x={x + 34} y={y + 34} width={w - 68} height={h - 68} rx={22} fill="#fbe3ec" />
+        </g>
+      );
+    case "armchair":
+      return (
+        <g key={item.id}>
+          <circle cx={x + w / 2} cy={y + h / 2 + 6} r={30} fill="#2b2233" opacity={0.08} />
+          <rect x={x + 10} y={y + 8} width={w - 20} height={h - 16} rx={14} fill="#7f98d6" />
+          <rect x={x + 22} y={y + 26} width={w - 44} height={h - 36} rx={10} fill="#9fb7ea" />
+          <rect x={x + w - 26} y={y + 26} width={12} height={28} rx={4} fill="#ffe08a" />
+        </g>
+      );
+    case "sideTable":
+      return (
+        <g key={item.id}>
+          <circle cx={x + w / 2} cy={y + h / 2} r={24} fill="#d9a77a" stroke="#b9875a" strokeWidth={3} />
+          <circle cx={x + w / 2 - 7} cy={y + h / 2 - 6} r={10} fill="#ffe08a" />
+          <rect x={x + w / 2 + 2} y={y + h / 2 + 2} width={14} height={18} rx={2} fill="#a597f3" />
+        </g>
+      );
+    case "doorSign":
+      return (
+        <g key={item.id}>
+          <rect x={x - 26} y={y + h + 4} width={28} height={14} rx={4} fill="#ffffff" stroke="#cfdbe3" strokeWidth={2} />
+          <circle cx={x - 12} cy={y + h + 11} r={3.5} fill="#cdb8f0" />
+        </g>
+      );
+    case "arcade": {
+      const first = item.id.endsWith("1");
+      return (
+        <g key={item.id}>
+          <rect x={x + 5} y={y + 2} width={w - 10} height={h - 8} rx={8} fill={first ? "#7a5fd2" : "#ff8fa3"} />
+          <rect x={x + 13} y={y + 10} width={w - 26} height={24} rx={4} fill={first ? "#9fe8ff" : "#ffd27a"} />
+          <rect x={x + 9} y={y + h - 22} width={w - 18} height={12} rx={4} fill="#3b3247" />
+          <circle cx={x + 22} cy={y + h - 16} r={3.5} fill="#e5484d" />
+          <circle cx={x + w - 22} cy={y + h - 16} r={3} fill="#ffe08a" />
+        </g>
+      );
+    }
+    case "foosball": {
+      const rods: ReactNode[] = [];
+      for (let i = 0; i < 6; i += 1) {
+        const rx = x + 22 + (i * (w - 44)) / 5;
+        rods.push(<line key={`r${i}`} x1={rx} y1={y + 8} x2={rx} y2={y + h - 8} stroke="#9a8fa6" strokeWidth={2} />);
+        rods.push(<rect key={`p${i}`} x={rx - 4} y={y + h / 2 - 5} width={8} height={10} rx={2} fill={i % 2 === 0 ? "#e5484d" : "#7bb5e6"} />);
+      }
+      return (
+        <g key={item.id}>
+          <rect x={x + 6} y={y + 10} width={w - 12} height={h - 20} rx={8} fill="#c9a27a" />
+          <rect x={x + 14} y={y + 16} width={w - 28} height={h - 32} rx={4} fill="#3fa173" />
+          <line x1={x + w / 2} y1={y + 16} x2={x + w / 2} y2={y + h - 16} stroke="#ffffff" strokeWidth={2} />
+          {rods}
+        </g>
+      );
+    }
+    case "photoBooth": {
+      const stripes: ReactNode[] = [];
+      for (let i = 0; i < 6; i += 1) {
+        stripes.push(
+          <rect key={i} x={x + 18 + i * ((w - 36) / 6)} y={y + h - 26} width={(w - 36) / 6} height={18} fill={i % 2 === 0 ? "#fbd9e6" : "#dcebfb"} />,
+        );
+      }
+      return (
+        <g key={item.id}>
+          <rect x={x + 6} y={y + h - 30} width={w - 12} height={26} rx={6} fill="#f7e9ff" stroke="#c9a27a" strokeWidth={3} />
+          {stripes}
+          <rect x={x + w / 2 - 34} y={y + h - 36} width={68} height={12} rx={6} fill="#7a5fd2" />
+          {[0, 1, 2, 3].map((i) => (
+            <circle key={`spot${i}`} cx={x + 24 + i * T} cy={y + T * 1.6} r={10} fill="#ffffff" opacity={0.8} />
+          ))}
+        </g>
+      );
+    }
+    case "photoCamera":
+      return (
+        <g key={item.id}>
+          <circle cx={x + w / 2} cy={y + h / 2 + 6} r={16} fill="#2b2233" opacity={0.08} />
+          <rect x={x + w / 2 - 14} y={y + h / 2 - 10} width={28} height={20} rx={6} fill="#ff8fa3" />
+          <circle cx={x + w / 2} cy={y + h / 2 - 12} r={8} fill="#3b3247" />
+          <circle cx={x + w / 2} cy={y + h / 2 - 12} r={4} fill="#7bb5e6" />
+        </g>
+      );
+    case "photoWall":
+      return (
+        <g key={item.id}>
+          <rect x={x + 6} y={y + 8} width={w - 12} height={h - 22} rx={5} fill="#d9a77a" stroke="#c9a27a" strokeWidth={3} />
+          {["#fbd9e6", "#dcebfb", "#e4f6ec", "#fff1c4"].map((fill, i) => (
+            <rect key={fill} x={x + 14 + i * ((w - 28) / 4)} y={y + 14} width={(w - 28) / 4 - 4} height={14} rx={2} fill={fill} stroke="#ffffff" strokeWidth={2} />
+          ))}
+        </g>
+      );
+    case "throwLine":
+      return <rect key={item.id} x={x + 20} y={y + h / 2 - 3} width={w - 40} height={6} rx={3} fill="#ffe08a" />;
+    case "stringLights": {
+      const bulbs: ReactNode[] = [];
+      for (let bx = x + 12; bx < x + w - 6; bx += 24) {
+        bulbs.push(<circle key={`n${bx}`} cx={bx} cy={y + 10} r={3.5} />);
+        bulbs.push(<circle key={`s${bx}`} cx={bx} cy={y + h - 10} r={3.5} />);
+      }
+      return (
+        <g key={item.id} fill="#ffe7a8" stroke="#e8c97a" strokeWidth={1}>
+          {bulbs}
+        </g>
+      );
+    }
   }
 }
 
@@ -297,8 +545,18 @@ function WorldMapArtInner({ plantMoods }: { plantMoods: Record<string, PlantMood
   const { width, height } = mapPixelSize(OFFICE_MAP);
   const walls: ReactNode[] = [];
   const faces: ReactNode[] = [];
+  const lawn: ReactNode[] = [];
+  const hedges: ReactNode[] = [];
   OFFICE_MAP.layout.forEach((row, r) => {
     for (let c = 0; c < row.length; c += 1) {
+      if (row[c] === "g") {
+        lawn.push(<rect key={`${c}-${r}`} x={c * T} y={r * T} width={T} height={T} />);
+        continue;
+      }
+      if (row[c] === "h") {
+        hedges.push(<rect key={`${c}-${r}`} x={c * T + 3} y={r * T + 1} width={T - 6} height={T - 2} rx={16} />);
+        continue;
+      }
       if (row[c] !== "#") continue;
       walls.push(<rect key={`${c}-${r}`} x={c * T} y={r * T} width={T} height={T} />);
       // A darker strip where a wall faces the floor below it gives a little depth.
@@ -308,8 +566,11 @@ function WorldMapArtInner({ plantMoods }: { plantMoods: Record<string, PlantMood
     }
   });
 
-  const floorItems = OFFICE_MAP.furniture.filter((item) => item.kind === "rug");
-  const otherItems = OFFICE_MAP.furniture.filter((item) => item.kind !== "rug");
+  // Flat things (rugs, paths) go under everything else.
+  const flat = (item: Furniture) =>
+    item.kind === "rug" || item.kind === "roomRug" || item.kind === "path" || item.kind === "throwLine";
+  const floorItems = OFFICE_MAP.furniture.filter(flat);
+  const otherItems = OFFICE_MAP.furniture.filter((item) => !flat(item));
 
   return (
     <svg
@@ -323,6 +584,14 @@ function WorldMapArtInner({ plantMoods }: { plantMoods: Record<string, PlantMood
         <pattern id="floor-wood" width={96} height={32} patternUnits="userSpaceOnUse">
           <rect width={96} height={32} fill="#f6e3ca" />
           <path d="M0 0.5 H96 M0 16.5 H96 M30 0 V16 M78 16 V32" stroke="#ead0ae" strokeWidth={1.5} />
+        </pattern>
+        <pattern id="floor-grass" width={48} height={48} patternUnits="userSpaceOnUse">
+          <rect width={48} height={48} fill="#cdeab4" />
+          <path d="M8 12 l2 -5 l2 5 M30 34 l2 -5 l2 5 M36 10 l2 -4 l2 4" stroke="#a9d58e" strokeWidth={1.5} fill="none" />
+        </pattern>
+        <pattern id="floor-wash" width={24} height={24} patternUnits="userSpaceOnUse">
+          <rect width={24} height={24} fill="#eef6fb" />
+          <path d="M0 0.5 H24 M0.5 0 V24" stroke="#d5e6f0" strokeWidth={1.5} />
         </pattern>
         <pattern id="floor-tiles" width={48} height={48} patternUnits="userSpaceOnUse">
           <rect width={48} height={48} fill="#e2f3ea" />
@@ -365,6 +634,10 @@ function WorldMapArtInner({ plantMoods }: { plantMoods: Record<string, PlantMood
         );
       })}
 
+      <g fill="#b9dca0">{lawn}</g>
+      <g fill="#5fae6e" stroke="#4a9a5c" strokeWidth={2}>
+        {hedges}
+      </g>
       <g fill={WALL} shapeRendering="crispEdges">
         {walls}
       </g>

@@ -20,6 +20,7 @@ declare
   invite_token text;
   first_check_in uuid;
   second_check_in uuid;
+  photo uuid;
   n integer;
   denied boolean;
 begin
@@ -125,6 +126,82 @@ begin
   end;
   if not denied then raise exception 'CHECK FAILED: a made-up plant id was accepted'; end if;
 
+  -- High scores: your best is kept, and scores no round could reach are refused.
+  perform public.submit_score('darts', 90);
+  perform public.submit_score('darts', 40);
+  if (select score from public.game_scores where user_id = ben and game = 'darts') <> 90 then
+    raise exception 'CHECK FAILED: a lower score replaced a better one';
+  end if;
+  perform public.submit_score('darts', 120);
+  if (select score from public.game_scores where user_id = ben and game = 'darts') <> 120 then
+    raise exception 'CHECK FAILED: a better score was not saved';
+  end if;
+  denied := false;
+  begin
+    perform public.submit_score('darts', 151);
+  exception when raise_exception then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: an impossible darts score was accepted'; end if;
+  denied := false;
+  begin
+    perform public.submit_score('chess', 1);
+  exception when raise_exception then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: a score for a made-up game was accepted'; end if;
+  denied := false;
+  begin
+    insert into public.game_scores (workspace_id, user_id, game, score) values (office, ben, 'snack', 474);
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: a score was written directly, bypassing the rules'; end if;
+
+  -- Photos: you have to be in it, everyone in it is a member, names come from profiles.
+  photo := public.pin_photo('garden', array[ben, ana]);
+  if (select people -> 0 ->> 'name' from public.photos where id = photo) <> 'Ben'
+     or (select jsonb_array_length(people) from public.photos where id = photo) <> 2 then
+    raise exception 'CHECK FAILED: a member could not pin a photo of themself and a teammate';
+  end if;
+  denied := false;
+  begin
+    perform public.pin_photo('garden', array[ben]);
+  exception when raise_exception then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: photos could be pinned back to back'; end if;
+  denied := false;
+  begin
+    insert into public.photos (workspace_id, taken_by, backdrop, people)
+    values (office, ben, 'garden', '[{"id": "x", "name": "Fake"}]');
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: a photo was written directly, bypassing the rules'; end if;
+
+  perform set_config('request.jwt.claims', json_build_object('sub', cy, 'role', 'authenticated')::text, true);
+  denied := false;
+  begin
+    perform public.pin_photo('stars', array[ana, ben]);
+  exception when raise_exception then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: someone pinned a photo they are not in'; end if;
+  denied := false;
+  begin
+    perform public.pin_photo('stars', array[cy, dee]);
+  exception when raise_exception then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: a photo included an outsider'; end if;
+  denied := false;
+  begin
+    perform public.pin_photo('disco', array[cy]);
+  exception when raise_exception then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: a made-up backdrop was accepted'; end if;
+  denied := false;
+  begin
+    perform public.remove_photo(photo);
+  exception when raise_exception then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: someone took down a photo they are not in'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', ben, 'role', 'authenticated')::text, true);
+
   -- 3. Check-ins: one per person per day, visible to teammates.
   first_check_in := public.save_check_in('Fixed the bug', 'Ship it', '');
   second_check_in := public.save_check_in('Fixed the bug', 'Ship it, then lunch', 'None');
@@ -224,6 +301,8 @@ begin
        + (select count(*) from public.profiles)
        + (select count(*) from public.check_ins)
        + (select count(*) from public.invites)
+       + (select count(*) from public.game_scores)
+       + (select count(*) from public.photos)
   into n;
   if n <> 0 then raise exception 'CHECK FAILED: an outsider can read % rows', n; end if;
   denied := false;
@@ -238,6 +317,24 @@ begin
   exception when raise_exception then denied := true;
   end;
   if not denied then raise exception 'CHECK FAILED: an outsider watered a plant'; end if;
+  denied := false;
+  begin
+    perform public.submit_score('snack', 10);
+  exception when raise_exception then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: an outsider saved a high score'; end if;
+  denied := false;
+  begin
+    perform public.pin_photo('garden', array[dee]);
+  exception when raise_exception then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: an outsider pinned a photo'; end if;
+  denied := false;
+  begin
+    perform public.remove_photo(photo);
+  exception when raise_exception then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: an outsider took down a photo'; end if;
   if private.can_use_topic('workspace:' || office::text) then
     raise exception 'CHECK FAILED: an outsider can join the live channel';
   end if;
@@ -266,6 +363,18 @@ begin
   exception when insufficient_privilege then denied := true;
   end;
   if not denied then raise exception 'CHECK FAILED: a signed-out visitor read profiles'; end if;
+  denied := false;
+  begin
+    select count(*) into n from public.game_scores;
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: a signed-out visitor read high scores'; end if;
+  denied := false;
+  begin
+    select count(*) into n from public.photos;
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'CHECK FAILED: a signed-out visitor read photos'; end if;
 
   denied := false;
   begin
@@ -277,6 +386,18 @@ begin
   execute 'reset role';
   if exists (select 1 from public.profiles where id = ben) then
     raise exception 'CHECK FAILED: a guest''s profile was kept after they left';
+  end if;
+  if exists (select 1 from public.game_scores where user_id = ben) then
+    raise exception 'CHECK FAILED: someone''s high scores were kept after they left';
+  end if;
+  -- Ben left: he is out of the photo (and no longer its taker); Ana is still in it.
+  if not exists (select 1 from public.photos where id = photo) then
+    raise exception 'CHECK FAILED: an outsider took down a photo, or it vanished when one person left';
+  end if;
+  if (select people from public.photos where id = photo) @> jsonb_build_array(jsonb_build_object('id', ben))
+     or (select taken_by from public.photos where id = photo) is not null
+     or (select jsonb_array_length(people) from public.photos where id = photo) <> 1 then
+    raise exception 'CHECK FAILED: someone who left is still in a photo';
   end if;
 
   raise exception 'ALL CHECKS PASSED (rolled back)';

@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { HALF_H, HALF_W, WorldEngine, type WorldPerson } from "./engine";
 import { boxHitsSolid, buildGrid, cellAt, isWalkable, moveWithCollisions } from "./grid";
-import { OFFICE_MAP, TILE, toPixels, zoneAt } from "./map";
+import {
+  OFFICE_MAP,
+  ROOM_COUNT,
+  TILE,
+  freePersonalRoom,
+  personalRoomAt,
+  personalRoomDoor,
+  personalRoomMiddle,
+  personalRoomRect,
+  toPixels,
+  zoneAt,
+} from "./map";
 import { findPath, nearestWalkable } from "./pathfinding";
 
 const grid = buildGrid(OFFICE_MAP);
@@ -134,7 +145,7 @@ describe("WorldEngine", () => {
     expect(zoneOf(engine, "me")).toBe("desks");
     expect(zoneOf(engine, "ana")).toBe("desks");
     expect(["focus", "meeting"]).toContain(zoneOf(engine, "ben"));
-    expect(["kitchen", "lounge"]).toContain(zoneOf(engine, "cy"));
+    expect(["kitchen", "lounge", "garden", "nap"]).toContain(zoneOf(engine, "cy"));
     expect(engine.entities.get("dee")!.visible).toBe(false);
   });
 
@@ -159,7 +170,7 @@ describe("WorldEngine", () => {
     expect(engine.entities.get("ana")!.path.length).toBeGreaterThan(0);
     run(engine, 40);
     expect(engine.entities.get("ana")!.path).toHaveLength(0);
-    expect(["kitchen", "lounge"]).toContain(zoneOf(engine, "ana"));
+    expect(["kitchen", "lounge", "garden", "nap"]).toContain(zoneOf(engine, "ana"));
   });
 
   it("keeps teammates out of walls and furniture while they walk", () => {
@@ -599,5 +610,102 @@ describe("things to use", () => {
     const ana = engine.entities.get("ana")!;
     expect(ana.holding).toBe("☕");
     expect(ana.emote).toBe("💧");
+  });
+});
+
+describe("the bigger office", () => {
+  const door = toPixels(OFFICE_MAP.entrance);
+  const fromDoor = cellAt(door.x, door.y);
+
+  it("keeps the original office exactly where it was", () => {
+    // The desks, the lounge and the front door haven't moved.
+    expect(zoneAt(OFFICE_MAP, 9 * TILE, 13.5 * TILE)?.id).toBe("desks");
+    expect(zoneAt(OFFICE_MAP, 25 * TILE, 15 * TILE)?.id).toBe("lounge");
+    expect(OFFICE_MAP.entrance).toEqual({ x: 10, y: 18.3 });
+  });
+
+  it("can walk from the front door to every room's Places spot", () => {
+    for (const zone of OFFICE_MAP.zones) {
+      const spot = toPixels(zone.spot);
+      expect(boxHitsSolid(grid, spot.x, spot.y, HALF_W, HALF_H), `${zone.id} spot is clear`).toBe(false);
+      expect(zoneAt(OFFICE_MAP, spot.x, spot.y)?.id, `${zone.id} spot is inside the room`).toBe(zone.id);
+      expect(findPath(grid, fromDoor, cellAt(spot.x, spot.y)), zone.id).not.toBeNull();
+    }
+  });
+
+  it("gives every personal room a door, and a way in from the front door", () => {
+    for (let index = 0; index < ROOM_COUNT; index += 1) {
+      const room = personalRoomRect(index);
+      const doorTile = personalRoomDoor(index);
+      expect(isWalkable(grid, doorTile.x, doorTile.y), `room ${index + 1} door`).toBe(true);
+      // The door is in the wall just above the room, and opens straight into it.
+      expect(doorTile.y + 1).toBe(room.y);
+      expect(doorTile.x >= room.x && doorTile.x < room.x + room.w).toBe(true);
+      expect(isWalkable(grid, doorTile.x, room.y), `room ${index + 1} inside the door`).toBe(true);
+      const middle = { c: room.x + 1, r: room.y + 1 };
+      expect(isWalkable(grid, middle.c, middle.r)).toBe(true);
+      expect(findPath(grid, fromDoor, middle), `room ${index + 1}`).not.toBeNull();
+    }
+  });
+
+  it("gives every piece of furniture, seat, thing and wall decoration its own id", () => {
+    for (const list of [OFFICE_MAP.furniture, OFFICE_MAP.seats, OFFICE_MAP.things, OFFICE_MAP.decor, OFFICE_MAP.zones]) {
+      const ids = list.map((item) => item.id);
+      expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
+    }
+  });
+
+  it("gives every personal room an armchair to sit in, and shows you as Busy inside", () => {
+    for (let index = 0; index < ROOM_COUNT; index += 1) {
+      const seat = OFFICE_MAP.seats.find((item) => item.id === `room-${index + 1}-seat`);
+      expect(seat, `room ${index + 1} seat`).toBeDefined();
+      expect(personalRoomAt(seat!.x, seat!.y)).toBe(index);
+      expect(findPath(grid, fromDoor, cellAt(seat!.x * TILE, seat!.y * TILE))).not.toBeNull();
+      const middle = toPixels(personalRoomMiddle(index));
+      expect(boxHitsSolid(grid, middle.x, middle.y, HALF_W, HALF_H)).toBe(false);
+      const zone = zoneAt(OFFICE_MAP, middle.x, middle.y);
+      expect(zone?.id).toBe("personal");
+      expect(zone?.status).toBe("busy");
+    }
+    // The garden outside isn't part of any room.
+    expect(personalRoomAt(55.5, 10.5)).toBe(-1);
+  });
+
+  it("sends you to a personal room nobody else is in", () => {
+    expect(freePersonalRoom([])).toBe(0);
+    expect(freePersonalRoom([personalRoomMiddle(0)])).toBe(1);
+    expect(freePersonalRoom([personalRoomMiddle(0), personalRoomMiddle(1)])).toBe(2);
+    expect(freePersonalRoom([personalRoomMiddle(1), { x: 5, y: 5 }])).toBe(0);
+    // All taken: still somewhere to go.
+    expect(freePersonalRoom([0, 1, 2].map(personalRoomMiddle))).toBe(0);
+  });
+
+  it("only lets you walk inside the building: never on the lawn or through the hedge", () => {
+    for (let r = 0; r < OFFICE_MAP.rows; r += 1) {
+      for (let c = 0; c < OFFICE_MAP.cols; c += 1) {
+        const tile = OFFICE_MAP.layout[r][c];
+        if (tile === "g" || tile === "h") expect(isWalkable(grid, c, r), `${c},${r}`).toBe(false);
+      }
+    }
+    // Every walkable tile can be reached from the front door: no sealed-off pockets.
+    const reachable = new Set<string>();
+    const queue = [fromDoor];
+    reachable.add(`${fromDoor.c},${fromDoor.r}`);
+    while (queue.length > 0) {
+      const { c, r } = queue.pop()!;
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const next = { c: c + dc, r: r + dr };
+        const key = `${next.c},${next.r}`;
+        if (!reachable.has(key) && isWalkable(grid, next.c, next.r)) {
+          reachable.add(key);
+          queue.push(next);
+        }
+      }
+    }
+    for (let r = 0; r < OFFICE_MAP.rows; r += 1) {
+      for (let c = 0; c < OFFICE_MAP.cols; c += 1) {
+        if (isWalkable(grid, c, r)) expect(reachable.has(`${c},${r}`), `${c},${r}`).toBe(true);
+      }
+    }
   });
 });

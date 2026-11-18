@@ -3,6 +3,7 @@ import {
   Color,
   DirectionalLight,
   HemisphereLight,
+  type Mesh,
   MeshStandardMaterial,
   PCFSoftShadowMap,
   PerspectiveCamera,
@@ -16,7 +17,7 @@ import {
 import type { PlantMood } from "@/lib/data/rules";
 import type { AvatarStyle, DisplayStatus } from "@/lib/data/types";
 import type { WorldEngine } from "@/lib/world/engine";
-import { TILE, canSit, sitPoint, type Seat, type WorldMap } from "@/lib/world/map";
+import { TILE, canSit, personalRoomAt, sitPoint, type Seat, type WorldMap } from "@/lib/world/map";
 import {
   FOV,
   PITCH,
@@ -28,8 +29,11 @@ import {
   toPixels,
   toScene,
 } from "./coords";
+import { Atmosphere } from "./atmosphere";
+import { Doors } from "./doors";
 import { sitSpot, type SitSpot } from "./furniture/seating";
-import { HEAD_HEIGHT, Pookie } from "./pookie";
+import { SIGN_FREE, SIGN_TAKEN } from "./furniture/washroom";
+import { Pookie } from "./pookie";
 import { MARKER_HEIGHT } from "./room";
 import { buildOfficeScene, type OfficeScene } from "./scene";
 
@@ -55,9 +59,17 @@ export class OfficeStage3D {
   private readonly camera = new PerspectiveCamera(FOV, 1, 0.5, 300);
   private readonly sun: DirectionalLight;
   private readonly office: OfficeScene;
+  private readonly atmosphere: Atmosphere;
+  private readonly doors: Doors;
+  /** Where everyone is this frame (tile units), for the doors. */
+  private readonly nearDoors: Array<{ x: number; y: number }> = [];
   private readonly people = new Map<string, Pookie>();
   private readonly seats = new Map<string, SitSpot>();
   private readonly seatList: Array<{ seat: Seat; spot: SitSpot }> = [];
+  /** Each stall door's sign, with the seat that is inside that stall. */
+  private readonly stallSigns: Array<{ sign: Mesh; seatId: string }> = [];
+  /** Each personal space room's sign, with that room's number (0-based). */
+  private readonly roomSigns: Array<{ sign: Mesh; room: number }> = [];
   private readonly raycaster = new Raycaster();
   private readonly scratch = new Vector3();
   private boardTexture: CanvasTexture | null = null;
@@ -93,14 +105,19 @@ export class OfficeStage3D {
     this.free = { ...center };
 
     this.scene.background = new Color("#5b4a63");
-    this.scene.add(new HemisphereLight("#fff8f0", "#b9a6c9", 1.45));
+    const hemi = new HemisphereLight("#fff8f0", "#b9a6c9", 1.45);
+    this.scene.add(hemi);
     this.sun = new DirectionalLight("#fff1dc", 2.9);
     this.sun.position.set(center.x - 9, 20, center.z + 11);
     this.sun.target.position.set(center.x, 0, center.z);
     this.sun.castShadow = true;
     const shadow = this.sun.shadow;
-    shadow.mapSize.set(2048, 2048);
-    Object.assign(shadow.camera, { left: -22, right: 22, top: 22, bottom: -22, near: 1, far: 70 });
+    // Sharp enough for the bigger building, but never more than the device can hold.
+    const shadowSize = Math.min(4096, this.renderer.capabilities.maxTextureSize);
+    shadow.mapSize.set(shadowSize, shadowSize);
+    // The sun's shadows cover the whole building, whatever its size.
+    const reach = Math.hypot(map.cols, map.rows) / 2 + 2;
+    Object.assign(shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach, near: 1, far: 100 });
     shadow.camera.updateProjectionMatrix();
     shadow.bias = -0.0004;
     shadow.normalBias = 0.02;
@@ -109,11 +126,31 @@ export class OfficeStage3D {
 
     this.office = buildOfficeScene(map, moods);
     this.scene.add(this.office.root);
+    this.atmosphere = new Atmosphere(this.scene, this.office.root, map, hemi, this.sun, this.calm);
+    this.doors = new Doors(map, this.calm);
+    this.scene.add(this.doors.root);
     for (const seat of map.seats) {
       const spot = sitSpot(map, seat);
       this.seats.set(seat.id, spot);
       if (canSit(seat)) this.seatList.push({ seat, spot });
     }
+    this.office.root.traverse((object) => {
+      const roomSign = object.userData.roomSign as string | undefined;
+      const room = roomSign ? map.furniture.find((item) => item.id === roomSign) : undefined;
+      if (room) {
+        const index = personalRoomAt(room.rect.x, room.rect.y + 1);
+        if (index >= 0) this.roomSigns.push({ sign: object as Mesh, room: index });
+      }
+      const stallId = object.userData.stallSign as string | undefined;
+      const stall = stallId ? map.furniture.find((item) => item.id === stallId) : undefined;
+      if (!stall) return;
+      const inside = map.seats.find((seat) => {
+        const at = sitPoint(seat);
+        const { x, y, w, h } = stall.rect;
+        return seat.kind === "stall" && at.x >= x && at.x <= x + w && at.y >= y && at.y <= y + h;
+      });
+      if (inside) this.stallSigns.push({ sign: object as Mesh, seatId: inside.id });
+    });
   }
 
   resize(width: number, height: number): void {
@@ -134,7 +171,7 @@ export class OfficeStage3D {
   /** Zoomed all the way out, the whole office fits on screen. */
   private maxDistance(): number {
     const fit = distanceFor(this.map.cols + 3, Math.max(this.width - this.inset, 1), this.height);
-    return clamp(fit, 16, 80);
+    return clamp(fit, 16, 120);
   }
 
   setPeople(people: StagePerson[]): void {
@@ -240,6 +277,7 @@ export class OfficeStage3D {
   /** Draws one frame. */
   frame(dt: number, engine: WorldEngine): void {
     this.watchSpeed(dt);
+    this.atmosphere.update(dt);
 
     for (const [id, entity] of engine.entities) {
       const pookie = this.people.get(id);
@@ -255,11 +293,42 @@ export class OfficeStage3D {
           sitting: Boolean(spot),
           seatYaw: spot ? spot.yaw : null,
           holdingCoffee: entity.holding === "☕",
-          visible: entity.visible,
+          // Nobody is seen inside a toilet stall.
+          visible: entity.visible && spot?.pose !== "hidden",
+          lying: spot?.pose === "lie",
         },
         dt,
         this.calm,
       );
+    }
+
+    // Stall doors say whether someone's inside.
+    if (this.stallSigns.length > 0) {
+      const taken = new Set<string>();
+      for (const entity of engine.entities.values()) {
+        if (entity.sitting && entity.seatId) taken.add(entity.seatId);
+      }
+      for (const { sign, seatId } of this.stallSigns) {
+        sign.material = taken.has(seatId) ? SIGN_TAKEN : SIGN_FREE;
+      }
+    }
+
+    // Doors swing open for anyone walking up to them.
+    this.nearDoors.length = 0;
+    for (const entity of engine.entities.values()) {
+      if (entity.visible) this.nearDoors.push({ x: entity.x / TILE, y: entity.y / TILE });
+    }
+    this.doors.update(dt, this.nearDoors);
+
+    // Personal space rooms say "In use" while anyone's inside.
+    if (this.roomSigns.length > 0) {
+      const used = new Set<number>();
+      for (const entity of engine.entities.values()) {
+        if (entity.visible) used.add(personalRoomAt(entity.x / TILE, entity.y / TILE));
+      }
+      for (const { sign, room } of this.roomSigns) {
+        sign.material = used.has(room) ? SIGN_TAKEN : SIGN_FREE;
+      }
     }
 
     const marker = this.office.marker;
@@ -280,7 +349,9 @@ export class OfficeStage3D {
   private moveCamera(dt: number, engine: WorldEngine): void {
     const perPixel = tilesPerPixel(this.distance, this.height);
     const covered = this.inset * perPixel;
-    const bounds = { minX: 0, maxX: this.map.cols + covered, minZ: 0, maxZ: this.map.rows };
+    // Don't drift far past the building's back wall: that's just empty sky.
+    const topMargin = ((this.height / 2) * perPixel) / Math.sin(PITCH) * 0.45;
+    const bounds = { minX: 0, maxX: this.map.cols + covered, minZ: Math.min(topMargin, this.map.rows / 2), maxZ: this.map.rows };
     // When the whole office fits on screen, keep it in the middle instead of chasing you;
     // otherwise stop at the office's side walls rather than showing empty space past them.
     const halfWidth = (this.width / 2) * perPixel;
@@ -348,7 +419,7 @@ export class OfficeStage3D {
     const pookie = this.people.get(id);
     if (!pookie) return null;
     const { x, z } = pookie.root.position;
-    return this.project(x, HEAD_HEIGHT + pookie.lift, z);
+    return this.project(x, pookie.labelHeight, z);
   }
 
   screenToWorld(sx: number, sy: number): { x: number; y: number } | null {
@@ -433,6 +504,8 @@ export class OfficeStage3D {
     for (const pookie of this.people.values()) pookie.dispose();
     this.people.clear();
     this.boardTexture?.dispose();
+    this.atmosphere.dispose();
+    this.doors.dispose();
     this.office.dispose();
     this.renderer.dispose();
   }

@@ -1,9 +1,18 @@
-import type {
-  ActionResult,
-  CheckInInput,
-  Invite,
-  Member,
-  Role,
+import { DARTS_MAX_SCORE } from "@/lib/games/darts";
+import { SNACK_MAX_SCORE } from "@/lib/games/snackCatch";
+import {
+  GAMES,
+  PHOTO_BACKDROPS,
+  PHOTO_POSES,
+  type Photo,
+  type PhotoPose,
+  type ActionResult,
+  type CheckInInput,
+  type GameId,
+  type GameScore,
+  type Invite,
+  type Member,
+  type Role,
 } from "./types";
 
 /**
@@ -33,10 +42,84 @@ export function plantMood(wateredAt: number | undefined, now: number): PlantMood
 }
 
 /** Emoji other browsers may show over someone: anything else is ignored. */
-export const SHARED_EMOTES: readonly string[] = ["☕", "💧"];
+export const SHARED_EMOTES: readonly string[] = ["☕", "💧", "🫧", "📸", "🎯", "🕹️"];
 
 const OK: ActionResult = { ok: true };
 const fail = (error: string): ActionResult => ({ ok: false, error });
+
+/** The highest score a round of each game can possibly reach. The database checks the same. */
+export const GAME_MAX: Record<GameId, number> = { snack: SNACK_MAX_SCORE, darts: DARTS_MAX_SCORE };
+
+export const GAME_NAMES: Record<GameId, string> = { snack: "Snack Catch", darts: "Darts" };
+
+export function validateScore(game: string, score: number): ActionResult {
+  if (!(GAMES as readonly string[]).includes(game)) return fail("That isn't a game here.");
+  if (!Number.isInteger(score) || score < 0 || score > GAME_MAX[game as GameId]) {
+    return fail("That score doesn't look right.");
+  }
+  return OK;
+}
+
+/** Keeps your best: returns the list with this score added, if it beats your old one. */
+export function withScore(
+  scores: readonly GameScore[],
+  entry: GameScore,
+): GameScore[] {
+  const old = scores.find((item) => item.game === entry.game && item.userId === entry.userId);
+  if (old && old.score >= entry.score) return [...scores];
+  return [...scores.filter((item) => item !== old), entry];
+}
+
+/** The best scores in one game, highest first (earlier wins a tie). */
+export function topScores(
+  scores: readonly GameScore[],
+  game: GameId,
+  count = 5,
+): GameScore[] {
+  return scores
+    .filter((item) => item.game === game)
+    .sort((a, b) => b.score - a.score || a.at - b.at)
+    .slice(0, count);
+}
+
+/** Up to four people fit in the booth; the wall keeps the newest twelve photos. */
+export const PHOTO_MAX_PEOPLE = 4;
+export const PHOTO_WALL_SIZE = 12;
+/** One photo every few seconds each, so the wall can't be flooded. */
+export const PHOTO_GAP_MS = 5000;
+
+export function validatePhoto(
+  backdrop: string,
+  peopleIds: readonly string[],
+  me: string,
+  members: readonly Member[],
+): ActionResult {
+  if (!(PHOTO_BACKDROPS as readonly string[]).includes(backdrop)) return fail("Pick a backdrop.");
+  if (peopleIds.length === 0 || peopleIds.length > PHOTO_MAX_PEOPLE) {
+    return fail(`The booth fits one to ${PHOTO_MAX_PEOPLE} people.`);
+  }
+  if (new Set(peopleIds).size !== peopleIds.length) return fail("Everyone only fits in once.");
+  if (!peopleIds.includes(me)) return fail("Step into the booth to be in the photo.");
+  if (!peopleIds.every((id) => members.some((member) => member.id === id))) {
+    return fail("Everyone in the photo has to be in the office.");
+  }
+  return OK;
+}
+
+/** Whoever is in a photo or took it can take it down; so can admins. */
+export function canRemovePhoto(photo: Photo, me: string, isAdmin: boolean): boolean {
+  return isAdmin || photo.takenBy === me || photo.people.some((person) => person.id === me);
+}
+
+/** Adds a photo to the front of the wall, dropping the oldest past twelve. */
+export function withPhoto(photos: readonly Photo[], photo: Photo): Photo[] {
+  return [photo, ...photos].slice(0, PHOTO_WALL_SIZE);
+}
+
+/** A pose for each person, picked at random. */
+export function randomPose(random: () => number = Math.random): PhotoPose {
+  return PHOTO_POSES[Math.floor(random() * PHOTO_POSES.length)];
+}
 
 /** Single line, no leading/trailing space, capped in length. */
 export function cleanLine(value: string, max: number): string {

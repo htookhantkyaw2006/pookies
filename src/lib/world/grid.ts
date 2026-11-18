@@ -16,7 +16,7 @@ export function buildGrid(map: WorldMap): Grid {
   const solid = new Uint8Array(map.cols * map.rows);
   for (let r = 0; r < map.rows; r += 1) {
     for (let c = 0; c < map.cols; c += 1) {
-      if (map.layout[r][c] === "#") solid[r * map.cols + c] = 1;
+      if (map.layout[r][c] !== ".") solid[r * map.cols + c] = 1;
     }
   }
   for (const item of map.furniture) {

@@ -3,6 +3,14 @@ import type { PlantMood } from "@/lib/data/rules";
 import type { BoardNote } from "@/lib/data/types";
 import type { RoomMember } from "@/lib/presence/derive";
 import { NEAR_DISTANCE, type WorldEntity } from "@/lib/world/engine";
+import { OFFICE_MAP, hidesYou, type Seat } from "@/lib/world/map";
+
+const SEATS = new Map<string, Seat>(OFFICE_MAP.seats.map((seat) => [seat.id, seat]));
+
+/** The seat someone is sitting in, if any. */
+function seatOf(entity: WorldEntity): Seat | undefined {
+  return entity.sitting && entity.seatId ? SEATS.get(entity.seatId) : undefined;
+}
 
 /**
  * A stage draws the office and owns its camera. The map view steps the world
@@ -40,7 +48,9 @@ export function syncAvatarNode(
   entity: WorldEntity,
   player: WorldEntity | null,
 ): void {
-  node.style.opacity = entity.visible ? "1" : "0";
+  const seat = seatOf(entity);
+  // Nobody is seen inside a toilet stall: not their character, not their name tag.
+  node.style.opacity = entity.visible && !hidesYou(seat) ? "1" : "0";
   const data = node.dataset;
   const near =
     player !== null &&
@@ -55,6 +65,7 @@ export function syncAvatarNode(
   set("near", String(near));
   set("emote", String(entity.emote !== null));
   set("sitting", String(entity.sitting));
+  set("resting", String(seat?.kind === "bed"));
   set("x", String(Math.round(entity.x)));
   set("y", String(Math.round(entity.y)));
 

@@ -149,6 +149,39 @@ export function createSeed(now: number, viewerZone: string): OfficeState {
         "plant-lounge-1": now - 50 * HOUR,
         "plant-kitchen": now - 20 * HOUR,
       },
+      // Some friendly competition already on the board.
+      scores: [
+        { game: "snack", userId: "u-maya", score: 112, at: now - 2 * DAY },
+        { game: "snack", userId: "u-tomas", score: 97, at: now - 1 * DAY },
+        { game: "snack", userId: "u-aisha", score: 84, at: now - 5 * HOUR },
+        { game: "darts", userId: "u-leo", score: 115, at: now - 3 * DAY },
+        { game: "darts", userId: "u-kofi", score: 90, at: now - 6 * HOUR },
+        { game: "darts", userId: "u-maya", score: 65, at: now - 1 * DAY },
+      ],
+      // A team photo from last week's ship day.
+      photos: [
+        {
+          id: "photo-ship-day",
+          takenAt: now - 4 * DAY,
+          takenBy: "u-maya",
+          backdrop: "confetti",
+          people: [
+            { id: "u-maya", name: "Maya Chen", avatar: { color: "peach", shape: "cat" }, pose: "peace" },
+            { id: "u-leo", name: "Leo Martins", avatar: { color: "sky", shape: "round" }, pose: "jump" },
+            { id: "u-aisha", name: "Aisha Khan", avatar: { color: "mint", shape: "bunny" }, pose: "heart" },
+          ],
+        },
+        {
+          id: "photo-fire",
+          takenAt: now - 9 * DAY,
+          takenBy: "u-tomas",
+          backdrop: "stars",
+          people: [
+            { id: "u-tomas", name: "Tomás Silva", avatar: { color: "butter", shape: "bear" }, pose: "wave" },
+            { id: "u-kofi", name: "Kofi Mensah", avatar: { color: "mint", shape: "bear" }, pose: "peace" },
+          ],
+        },
+      ],
     },
   };
 }

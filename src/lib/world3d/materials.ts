@@ -19,6 +19,18 @@ export interface Finish {
   rough?: number;
   metal?: number;
   opacity?: number;
+  /**
+   * When the glow shows: "night" for lamps, string lights and the fire (bright
+   * after dark, almost off by day); "day" for window glass (bright by day).
+   * The stage adjusts these with the time of day.
+   */
+  when?: "night" | "day";
+}
+
+/** A material whose glow follows the time of day. */
+export interface TimedGlow {
+  when: "night" | "day";
+  glow: number;
 }
 
 const cache = new Map<string, MeshStandardMaterial>();
@@ -27,7 +39,7 @@ export function paint(color: string, finish: Finish = {}): MeshStandardMaterial 
   const rough = finish.rough ?? 0.82;
   const metal = finish.metal ?? 0;
   const opacity = finish.opacity ?? 1;
-  const key = `${color}|${finish.emissive ?? ""}|${finish.glow ?? 0}|${rough}|${metal}|${opacity}`;
+  const key = `${color}|${finish.emissive ?? ""}|${finish.glow ?? 0}|${rough}|${metal}|${opacity}|${finish.when ?? ""}`;
   let material = cache.get(key);
   if (!material) {
     material = new MeshStandardMaterial({
@@ -39,6 +51,10 @@ export function paint(color: string, finish: Finish = {}): MeshStandardMaterial 
       transparent: opacity < 1,
       opacity,
     });
+    if (finish.when) {
+      const timed: TimedGlow = { when: finish.when, glow: finish.glow ?? 0 };
+      material.userData.timedGlow = timed;
+    }
     cache.set(key, material);
   }
   return material;

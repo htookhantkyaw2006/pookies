@@ -37,7 +37,7 @@ function windowPane(width: number): Group {
   const glass = "#cfe9ff";
   const pane = group(
     rbox(width, 0.74, 0.06, COLORS.paper, 0, 0.78, 0.03, 0.02),
-    box(width - 0.12, 0.62, 0.02, glass, 0, 0.78, 0.065, { emissive: "#bfe4ff", glow: 0.55, rough: 0.2 }),
+    box(width - 0.12, 0.62, 0.02, glass, 0, 0.78, 0.065, { emissive: "#bfe4ff", glow: 0.55, rough: 0.2, when: "day" }),
     box(0.035, 0.62, 0.03, COLORS.paper, 0, 0.78, 0.075),
     box(width - 0.12, 0.035, 0.03, COLORS.paper, 0, 0.8, 0.075),
     rbox(width + 0.12, 0.04, 0.14, COLORS.paper, 0, 0.42, 0.07, 0.015),
@@ -74,6 +74,48 @@ function poster(width: number, color: string): Group {
   );
 }
 
+/** A wide wall mirror with a soft frame. */
+function mirror(width: number): Group {
+  return group(
+    rbox(width, 0.7, 0.04, "#dfe7ee", 0, 0.92, 0.02, 0.03),
+    box(width - 0.1, 0.6, 0.01, "#cfe6f5", 0, 0.92, 0.045, { metal: 0.4, rough: 0.08 }),
+    box(width * 0.5, 0.04, 0.012, "#ffffff", -width * 0.15, 1.08, 0.052, { opacity: 0.6 }),
+  );
+}
+
+/** A round dartboard: rings from the bull out, a dark surround. */
+function dartboard(width: number): Group {
+  const r = width / 2;
+  const disc = (radius: number, color: string, depth: number) =>
+    cyl(radius, radius, 0.012, color, 0, 0.86, depth, 32).rotateX(Math.PI / 2);
+  return group(
+    disc(r, COLORS.dark, 0.02),
+    disc(r * 0.8, "#f4e7cf", 0.032),
+    disc(r * 0.62, COLORS.red, 0.036),
+    disc(r * 0.45, "#f4e7cf", 0.04),
+    disc(r * 0.25, COLORS.green, 0.044),
+    disc(r * 0.09, COLORS.red, 0.048),
+    // One dart already stuck in it.
+    cyl(0.008, 0.008, 0.12, COLORS.metal, r * 0.3, 0.92, 0.1, 6).rotateX(Math.PI / 2),
+    box(0.04, 0.03, 0.005, COLORS.purple, r * 0.3, 0.92, 0.16),
+  );
+}
+
+/** The high-score board: a little screen with rows of glowing "scores". */
+function scoreboard(width: number): Group {
+  const parts = [
+    rbox(width, 0.62, 0.05, COLORS.dark, 0, 0.86, 0.025, 0.03),
+    box(width - 0.1, 0.1, 0.01, COLORS.butter, 0, 1.08, 0.055, { emissive: COLORS.butter, glow: 0.8 }),
+  ];
+  const colors = ["#9fe8ff", "#ffb5c9", "#a9e5c8", "#cfbcf8"];
+  colors.forEach((color, row) => {
+    const y = 0.95 - row * 0.1;
+    parts.push(box(0.06, 0.05, 0.01, color, -width / 2 + 0.12, y, 0.055, { emissive: color, glow: 0.8 }));
+    parts.push(box(width * (0.5 - row * 0.06), 0.035, 0.01, color, -width / 2 + 0.2 + (width * (0.5 - row * 0.06)) / 2, y, 0.055, { emissive: color, glow: 0.6 }));
+  });
+  return group(...parts);
+}
+
 const FACING_YAW = { south: 0, east: Math.PI / 2, west: -Math.PI / 2 } as const;
 
 /** A window, clock or poster, hung on its wall. */
@@ -83,7 +125,13 @@ export function buildWallDecor(decor: WallDecor): Group {
       ? windowPane(decor.width)
       : decor.kind === "clock"
         ? clock()
-        : poster(decor.width, decor.color ?? COLORS.lilac);
+        : decor.kind === "mirror"
+          ? mirror(decor.width)
+          : decor.kind === "dartboard"
+            ? dartboard(decor.width)
+            : decor.kind === "scoreboard"
+              ? scoreboard(decor.width)
+              : poster(decor.width, decor.color ?? COLORS.lilac);
   piece.position.set(decor.x, 0, decor.z);
   piece.rotation.y = FACING_YAW[decor.faces];
   return piece;
