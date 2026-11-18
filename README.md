@@ -42,8 +42,8 @@ Pookies runs in one of two modes, chosen by `.env.local` (see [.env.example](.en
 
 | Mode | When | What you get |
 |---|---|---|
-| Sample office | No Supabase values, or `NEXT_PUBLIC_DATA_SOURCE=sample` | Pretend teammates who wander about. Nothing is saved. Good for looking at the design |
-| Live office | Supabase URL and publishable key are set | The real thing: other browsers see you walk, change status and check in |
+| Sample office | `NEXT_PUBLIC_DATA_SOURCE=sample` | Pretend teammates who wander about. Nothing is saved. Good for looking at the design |
+| Live office | Otherwise | The real thing: accounts, workspaces, and other browsers see you walk, change status and check in. Uses the Supabase project in `src/lib/data/supabase/project.ts` (its publishable key is public by design), unless `.env.local` or Vercel set their own |
 
 ### Live office: accounts and workspaces
 

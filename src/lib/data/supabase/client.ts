@@ -1,8 +1,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import { PROJECT_PUBLISHABLE_KEY, PROJECT_URL } from "./project";
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
+// Settings from the environment win; an empty or missing one falls back to the live project.
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL || PROJECT_URL;
+const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || PROJECT_PUBLISHABLE_KEY;
 
 /** True when the app should talk to the real backend instead of sample data. */
 export const hasSupabaseConfig =
