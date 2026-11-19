@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 import { OfficeProvider } from "@/lib/data/react";
-import { AppShell } from "@/components/shell/AppShell";
+import { GameShell } from "@/components/shell/GameShell";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <OfficeProvider>
-      <AppShell>{children}</AppShell>
+      <GameShell>{children}</GameShell>
     </OfficeProvider>
   );
 }

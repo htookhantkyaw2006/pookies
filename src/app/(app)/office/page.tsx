@@ -1,13 +1,8 @@
 import type { Metadata } from "next";
-import { OfficeScreen } from "@/components/office/OfficeScreen";
-import { OfficeDoor } from "@/components/shell/OfficeDoor";
 
 export const metadata: Metadata = { title: "Office" };
 
+/** The office is the game itself, which the layout always shows. */
 export default function OfficePage() {
-  return (
-    <OfficeDoor framed>
-      <OfficeScreen />
-    </OfficeDoor>
-  );
+  return null;
 }

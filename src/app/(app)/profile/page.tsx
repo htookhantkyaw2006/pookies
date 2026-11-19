@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { ProfileScreen } from "@/components/profile/ProfileScreen";
-import { OfficeDoor } from "@/components/shell/OfficeDoor";
+import { ScreenOverlay } from "@/components/shell/ScreenOverlay";
 
 export const metadata: Metadata = { title: "Profile" };
 
 export default function ProfilePage() {
   return (
-    <OfficeDoor>
+    <ScreenOverlay label="Profile">
       <ProfileScreen />
-    </OfficeDoor>
+    </ScreenOverlay>
   );
 }

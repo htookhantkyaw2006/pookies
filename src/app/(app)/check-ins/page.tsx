@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { CheckInsScreen } from "@/components/check-ins/CheckInsScreen";
-import { OfficeDoor } from "@/components/shell/OfficeDoor";
+import { ScreenOverlay } from "@/components/shell/ScreenOverlay";
 
 export const metadata: Metadata = { title: "Check-ins" };
 
 export default function CheckInsPage() {
   return (
-    <OfficeDoor>
+    <ScreenOverlay label="Check-ins">
       <CheckInsScreen />
-    </OfficeDoor>
+    </ScreenOverlay>
   );
 }

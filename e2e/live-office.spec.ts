@@ -42,12 +42,13 @@ async function closePopovers(page: Page): Promise<void> {
   await page.keyboard.press("Escape");
 }
 
+/** Leaves through the office menu (top-left corner of the game), if still inside. */
 async function leave(page: Page): Promise<void> {
-  const button = page.getByRole("button", { name: "Leave office" });
-  if (await button.isVisible().catch(() => false)) {
-    await button.click();
-    await expect(page.getByLabel("Your nickname")).toBeVisible();
-  }
+  const menu = page.getByRole("button", { name: / menu$/ });
+  if (!(await menu.isVisible().catch(() => false))) return;
+  await menu.click();
+  await page.getByRole("menuitem", { name: "Leave office" }).click();
+  await expect(page.getByLabel("Your nickname")).toBeVisible();
 }
 
 /** Picks a status from the status pill over the map. */

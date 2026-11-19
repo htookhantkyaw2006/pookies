@@ -145,11 +145,14 @@ interface Gesture {
  * the flat 2D map.
  */
 export function WorldView({
+  menu,
   greeting,
   status,
   renderPanel,
 }: {
-  /** Top left, above the room you're in. */
+  /** Top-left corner: the office's menu (its code, profile, admin, leave). */
+  menu: ReactNode;
+  /** Top left, under the menu and above the room you're in. */
   greeting: ReactNode;
   /** Top right: your own status control. */
   status: ReactNode;
@@ -453,6 +456,11 @@ export function WorldView({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
+      // A page open over the game (check-ins, profile, admin) has the keyboard.
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) {
+        release();
+        return;
+      }
       if (isPlaying()) {
         release();
         return;
@@ -641,8 +649,11 @@ export function WorldView({
 
         {/* Heads-up display. Everything below floats over the map. */}
 
+        {/* Top-left corner: the office's menu. */}
+        <div className="absolute top-3 left-3 z-[2600]">{menu}</div>
+
         {/* Top left: hello, and the room you're in. */}
-        <div className="pointer-events-none absolute top-[4.25rem] left-3 flex max-w-[calc(100%-1.5rem)] min-w-0 flex-col items-start gap-2 sm:top-3 sm:max-w-[calc(100%-max(var(--panel,0rem),17rem)-1.5rem)]">
+        <div className="pointer-events-none absolute top-[4.25rem] left-3 flex max-w-[calc(100%-1.5rem)] min-w-0 flex-col items-start gap-2 sm:max-w-[calc(100%-max(var(--panel,0rem),17rem)-1.5rem)]">
           {greeting}
           <p
             aria-live="polite"

@@ -4,6 +4,7 @@ import { useOffice } from "@/lib/data/react";
 import { greetingForHour, hourInZone, longDateInZone } from "@/lib/dates";
 import { buildRoom, countAround } from "@/lib/presence/derive";
 import { WorldView } from "@/components/world/WorldView";
+import { OfficeMenu } from "./OfficeMenu";
 import { OfficeSidePanel } from "./OfficeSidePanel";
 import { StatusControl } from "./StatusControl";
 
@@ -17,6 +18,7 @@ export function OfficeScreen() {
 
   return (
     <WorldView
+      menu={<OfficeMenu />}
       greeting={
         <div className="sr-only max-w-full rounded-2xl bg-surface/95 px-4 py-2 shadow-lift backdrop-blur sm:not-sr-only">
           <h1 className="truncate text-lg leading-tight font-semibold tracking-tight text-ink sm:text-xl">

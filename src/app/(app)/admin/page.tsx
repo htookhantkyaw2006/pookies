@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { AdminScreen } from "@/components/admin/AdminScreen";
-import { OfficeDoor } from "@/components/shell/OfficeDoor";
+import { ScreenOverlay } from "@/components/shell/ScreenOverlay";
 
 export const metadata: Metadata = { title: "Admin" };
 
 export default function AdminPage() {
   return (
-    <OfficeDoor>
+    <ScreenOverlay label="Admin">
       <AdminScreen />
-    </OfficeDoor>
+    </ScreenOverlay>
   );
 }
